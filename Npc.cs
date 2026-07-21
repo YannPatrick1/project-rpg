@@ -5,6 +5,9 @@ public partial class Npc : CharacterBody3D
 	[Export]
 	public int MaxHealth = 3;
 
+	[Export]
+	public PackedScene KeyPickupScene;
+
 	private int _currentHealth;
 
 	public override void _Ready()
@@ -24,8 +27,16 @@ public partial class Npc : CharacterBody3D
 	}
 
 	private void Die()
+{
+	GD.Print("NPC died");
+
+	if (KeyPickupScene != null)
 	{
-		GD.Print("NPC died");
-		QueueFree();
+		var keyInstance = KeyPickupScene.Instantiate<Node3D>();
+		GetParent().AddChild(keyInstance);
+		keyInstance.GlobalPosition = GlobalPosition;
 	}
+
+	QueueFree();
+}
 }

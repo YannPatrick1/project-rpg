@@ -1,0 +1,17 @@
+[gd_scene format=3 uid="uid://b7ovldhtfgmu7"]
+
+[ext_resource type="Script" uid="uid://0n8ipaa54ft5" path="res://KeyPickup.cs" id="1_ljgls"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_rlqx7"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_rlqx7"]
+
+[node name="KeyPickup" type="Area3D" unique_id=2001972093]
+script = ExtResource("1_ljgls")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=870400801]
+transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 0, 0, 0)
+mesh = SubResource("BoxMesh_rlqx7")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=141358499]
+shape = SubResource("BoxShape3D_rlqx7")
