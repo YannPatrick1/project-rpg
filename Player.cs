@@ -40,4 +40,19 @@ public partial class Player : CharacterBody3D
 		Velocity = velocity;
 		MoveAndSlide();
 	}
+	public override void _Input(InputEvent @event)
+	{
+		if (Input.IsActionJustPressed("attack"))
+		{
+			var npc = GetNodeOrNull<Npc>("/root/World/NPC");
+			if (npc != null)
+			{
+				float distance = GlobalPosition.DistanceTo(npc.GlobalPosition);
+				if (distance < 3.0f)
+				{
+					npc.TakeDamage(1);
+				}
+			}
+		}
+	}
 }

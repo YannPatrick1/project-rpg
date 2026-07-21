@@ -1,0 +1,22 @@
+[gd_scene format=3 uid="uid://bd1e6n5d124oq"]
+
+[ext_resource type="Script" uid="uid://c6na6slwymqkp" path="res://Npc.cs" id="1_ideak"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_n8j3f"]
+albedo_color = Color(1, 0.050980393, 0.05490196, 1)
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_jkjxl"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_v7lw1"]
+
+[node name="NPC" type="CharacterBody3D" unique_id=1617591341]
+script = ExtResource("1_ideak")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=358542156]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+material_override = SubResource("StandardMaterial3D_n8j3f")
+mesh = SubResource("CapsuleMesh_jkjxl")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1002346298]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+shape = SubResource("CapsuleShape3D_v7lw1")
