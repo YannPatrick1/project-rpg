@@ -36,3 +36,5 @@ script = ExtResource("2_fj7yv")
 
 [node name="NPC" parent="." unique_id=1617591341 instance=ExtResource("3_tlwt5")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 3)
+
+[node name="LootMenu" type="PopupMenu" parent="." unique_id=1989041173]

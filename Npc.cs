@@ -1,13 +1,14 @@
 using Godot;
+using System.Collections.Generic;
 
 public partial class Npc : CharacterBody3D
 {
 	[Export]
 	public int MaxHealth = 3;
-
 	[Export]
 	public PackedScene KeyPickupScene;
-
+	[Export]
+	public PackedScene LootPileScene;
 	private int _currentHealth;
 
 	public override void _Ready()
@@ -19,7 +20,6 @@ public partial class Npc : CharacterBody3D
 	{
 		_currentHealth -= amount;
 		GD.Print("NPC took damage, health is now " + _currentHealth);
-
 		if (_currentHealth <= 0)
 		{
 			Die();
@@ -27,16 +27,17 @@ public partial class Npc : CharacterBody3D
 	}
 
 	private void Die()
-{
+	{
 	GD.Print("NPC died");
 
-	if (KeyPickupScene != null)
+	if (LootPileScene != null)
 	{
-		var keyInstance = KeyPickupScene.Instantiate<Node3D>();
-		GetParent().AddChild(keyInstance);
-		keyInstance.GlobalPosition = GlobalPosition;
+		var lootPile = LootPileScene.Instantiate<LootPile>();
+		lootPile.Items = new List<string> { "Key", "Bones" };
+		GetParent().AddChild(lootPile);
+		lootPile.GlobalPosition = GlobalPosition;      // <-- now set AFTER it's in the tree
 	}
 
 	QueueFree();
-}
+	}
 }

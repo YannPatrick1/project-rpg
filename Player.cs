@@ -17,10 +17,15 @@ public partial class Player : CharacterBody3D
 	
 	private float _cameraYaw = 0f;
 	private float _cameraPitch = -20f;
+	
+	private PopupMenu _lootMenu;
+	private LootPile _activeLootPile;
 
 	public override void _Ready()
 	{
 		_springArm = GetNode<SpringArm3D>("SpringArm3D");
+		_lootMenu = GetNode<PopupMenu>("/root/World/LootMenu");
+		_lootMenu.IndexPressed += OnLootMenuIndexPressed;
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -134,10 +139,49 @@ public partial class Player : CharacterBody3D
 					GD.Print("Too far away to pick that up.");
 				}
 			}
+			else if (!isRightClick && collider is LootPile lootPile && lootPile.Items.Count > 0)
+			{
+				float distance = GlobalPosition.DistanceTo(lootPile.GlobalPosition);
+				if (distance < 3.0f)
+				{
+					string topItem = lootPile.Items[0];
+					var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
+					inventory.AddItem(topItem);
+					GD.Print("Looted: ", topItem);
+					lootPile.RemoveItem(topItem);
+				}
+				else
+				{
+					GD.Print("Too far away to pick that up.");
+				}
+			}
+			else if (isRightClick && collider is LootPile lootPile2)
+			{
+				_activeLootPile = lootPile2;
+				_lootMenu.Clear();
+				foreach (string item in lootPile2.Items)
+				{
+					_lootMenu.AddItem(item);
+				}
+				_lootMenu.Position = (Vector2I)mousePos;
+				_lootMenu.Popup();
+			}
 		}                                       // <-- ADDED: closes "if (result.Count > 0)"
 		else
 		{
 			GD.Print("Clicked on nothing.");
 		}
+	}
+	private void OnLootMenuIndexPressed(long index)
+	{
+		if (_activeLootPile == null) return;
+
+		string itemName = _lootMenu.GetItemText((int)index);
+		var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
+		inventory.AddItem(itemName);
+		GD.Print("Looted: ", itemName);
+
+		_activeLootPile.RemoveItem(itemName);
+		_activeLootPile = null;
 	}
 }

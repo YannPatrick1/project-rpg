@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://c6na6slwymqkp" path="res://Npc.cs" id="1_ideak"]
 [ext_resource type="PackedScene" uid="uid://b7ovldhtfgmu7" path="res://key_pickup.tscn" id="2_xxcha"]
+[ext_resource type="PackedScene" uid="uid://eu7x33juvwfr" path="res://loot_pile.tscn" id="3_kh24r"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_n8j3f"]
 albedo_color = Color(1, 0.050980393, 0.05490196, 1)
@@ -13,6 +14,7 @@ albedo_color = Color(1, 0.050980393, 0.05490196, 1)
 [node name="NPC" type="CharacterBody3D" unique_id=1617591341]
 script = ExtResource("1_ideak")
 KeyPickupScene = ExtResource("2_xxcha")
+LootPileScene = ExtResource("3_kh24r")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=358542156]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)

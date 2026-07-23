@@ -1,0 +1,17 @@
+[gd_scene format=3 uid="uid://eu7x33juvwfr"]
+
+[ext_resource type="Script" uid="uid://g7uwmtycqsj6" path="res://LootPile.cs" id="1_y6f7s"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_rlqx7"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_rlqx7"]
+
+[node name="LootPile" type="Area3D" unique_id=2001972093]
+script = ExtResource("1_y6f7s")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=870400801]
+transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 0, 0, 0)
+mesh = SubResource("BoxMesh_rlqx7")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=141358499]
+shape = SubResource("BoxShape3D_rlqx7")
