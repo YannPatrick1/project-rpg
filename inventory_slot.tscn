@@ -1,0 +1,17 @@
+[gd_scene format=3 uid="uid://cu8fytn3018kk"]
+
+[ext_resource type="Script" uid="uid://ch84gd3kaley8" path="res://InventorySlot.cs" id="1_42eed"]
+
+[node name="InventorySlot" type="Panel" unique_id=983030602]
+custom_minimum_size = Vector2(64, 54)
+offset_right = 40.0
+offset_bottom = 40.0
+script = ExtResource("1_42eed")
+
+[node name="Label" type="Label" parent="." unique_id=1361711283]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
