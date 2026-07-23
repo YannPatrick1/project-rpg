@@ -1,0 +1,18 @@
+[gd_scene format=3 uid="uid://5shs8doqt1f4"]
+
+[ext_resource type="Script" uid="uid://dqlyantre24h4" path="res://Chest.cs" id="1_twpm2"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_jkjxl"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_rlqx7"]
+
+[node name="Chest" type="StaticBody3D" unique_id=201288269]
+script = ExtResource("1_twpm2")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=2115022581]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, -0.5, 0)
+mesh = SubResource("BoxMesh_jkjxl")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=2006730256]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, -0.5, 0)
+shape = SubResource("BoxShape3D_rlqx7")
