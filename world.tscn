@@ -4,8 +4,13 @@
 [ext_resource type="Script" uid="uid://dume5ikp5nr0x" path="res://Inventory.cs" id="2_fj7yv"]
 [ext_resource type="PackedScene" uid="uid://bd1e6n5d124oq" path="res://npc.tscn" id="3_tlwt5"]
 [ext_resource type="PackedScene" uid="uid://d4nvxr7w3h3x2" path="res://inventory_ui.tscn" id="4_aqk2v"]
+[ext_resource type="PackedScene" uid="uid://5shs8doqt1f4" path="res://chest.tscn" id="5_036b0"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_twpm2"]
+albedo_color = Color(0.27450982, 0.50980395, 0.19607843, 1)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_rlqx7"]
+material = SubResource("StandardMaterial3D_twpm2")
 size = Vector2(30, 30)
 
 [sub_resource type="ConcavePolygonShape3D" id="ConcavePolygonShape3D_f3sb7"]
@@ -41,3 +46,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 3)
 [node name="LootMenu" type="PopupMenu" parent="." unique_id=1989041173]
 
 [node name="InventoryUI" parent="." unique_id=927017573 instance=ExtResource("4_aqk2v")]
+
+[node name="Chest" parent="." unique_id=373795362 instance=ExtResource("5_036b0")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1, -4)
