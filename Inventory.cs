@@ -26,6 +26,8 @@ public partial class Inventory : Node
 	public bool AddItem(string itemName, int quantity = 1)
 	{
 		// If this item type stacks, look for an existing stack of it first.
+		// This is allowed even when the inventory is otherwise full, since
+		// it doesn't need a new slot.
 		if (ItemDatabase.IsStackable(itemName))
 		{
 			for (int i = 0; i < SlotCount; i++)
@@ -53,7 +55,7 @@ public partial class Inventory : Node
 			}
 		}
 
-		GD.Print("Inventory full, could not add " + itemName);
+		GD.Print("Your inventory is full");
 		return false;
 	}
 

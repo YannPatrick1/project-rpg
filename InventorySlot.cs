@@ -30,7 +30,7 @@ public partial class InventorySlot : Panel
 
 	public void SetItem(string itemName, int quantity)
 	{
-		_label.Text = quantity > 1 ? itemName + " x" + quantity : itemName;
+		_label.Text = ItemDatabase.GetDisplayText(itemName, quantity);
 	}
 
 	public void Clear()

@@ -1,11 +1,13 @@
 using Godot;
 using System;
+using System.Collections.Generic;
 
 public partial class Player : CharacterBody3D
 {
 	private SpringArm3D _springArm;
 	private PopupMenu _lootMenu;
 	private ILootable _activeLoot;
+	private List<string> _lootMenuItemNames = new();
 	private InventoryUI _inventoryUI;
 
 	public const float Speed = 5.0f;
@@ -162,10 +164,7 @@ public partial class Player : CharacterBody3D
 			if (distance < 3.0f)
 			{
 				string topItem = lootPile.Items[0];
-				var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
-				inventory.AddItem(topItem);
-				GD.Print("Looted: ", topItem);
-				lootPile.RemoveItem(topItem);
+				GrabItem(lootPile, topItem);
 			}
 			else
 			{
@@ -205,14 +204,38 @@ public partial class Player : CharacterBody3D
 		if (distance < 3.0f)
 		{
 			string topItem = chest.Items[0];
-			var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
-			inventory.AddItem(topItem);
-			GD.Print("Looted: ", topItem);
-			chest.RemoveItem(topItem);
+			GrabItem(chest, topItem);
 		}
 		else
 		{
 			GD.Print("Too far away to pick that up.");
+		}
+	}
+
+	// Grabs ALL matching entries of a stacked item in one click (e.g. all 3
+	// "Coins" entries at once), or just the single entry for non-stackable items.
+	private void GrabItem(ILootable lootable, string itemName)
+	{
+		int count = 0;
+		foreach (string item in lootable.Items)
+		{
+			if (item == itemName) count++;
+		}
+
+		var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
+		bool added = inventory.AddItem(itemName, count);
+
+		if (!added)
+		{
+			// Inventory full and this isn't an existing stack — leave it where it is.
+			return;
+		}
+
+		GD.Print("Looted: " + ItemDatabase.GetDisplayText(itemName, count));
+
+		for (int i = 0; i < count; i++)
+		{
+			lootable.RemoveItem(itemName);
 		}
 	}
 
@@ -269,14 +292,31 @@ public partial class Player : CharacterBody3D
 		}
 	}
 
+	// Groups duplicate entries (e.g. three "Coins") into a single menu row
+	// with a combined display like "3 Gold Coins", instead of listing each
+	// one separately.
 	private void OpenLootMenu(ILootable lootable, Vector2 mousePos)
 	{
 		_activeLoot = lootable;
 		_lootMenu.Clear();
+		_lootMenuItemNames.Clear();
+
+		var seen = new HashSet<string>();
 		foreach (string item in lootable.Items)
 		{
-			_lootMenu.AddItem(item);
+			if (seen.Contains(item)) continue;
+			seen.Add(item);
+
+			int count = 0;
+			foreach (string i in lootable.Items)
+			{
+				if (i == item) count++;
+			}
+
+			_lootMenu.AddItem(ItemDatabase.GetDisplayText(item, count));
+			_lootMenuItemNames.Add(item);
 		}
+
 		_lootMenu.Position = (Vector2I)mousePos;
 		_lootMenu.Popup();
 	}
@@ -285,12 +325,30 @@ public partial class Player : CharacterBody3D
 	{
 		if (_activeLoot == null) return;
 
-		string itemName = _lootMenu.GetItemText((int)index);
-		var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
-		inventory.AddItem(itemName);
-		GD.Print("Looted: ", itemName);
+		string itemName = _lootMenuItemNames[(int)index];
 
-		_activeLoot.RemoveItem(itemName);
+		int count = 0;
+		foreach (string item in _activeLoot.Items)
+		{
+			if (item == itemName) count++;
+		}
+
+		var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
+		bool added = inventory.AddItem(itemName, count);
+
+		if (!added)
+		{
+			_activeLoot = null;
+			return;
+		}
+
+		GD.Print("Looted: " + ItemDatabase.GetDisplayText(itemName, count));
+
+		for (int i = 0; i < count; i++)
+		{
+			_activeLoot.RemoveItem(itemName);
+		}
+
 		_activeLoot = null;
 	}
 }
