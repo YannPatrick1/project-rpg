@@ -11,8 +11,7 @@ public static class ItemDatabase
 		{ "Gem", false },
 	};
 
-	// Only stackable items need singular/plural names — non-stackable
-	// items just display their raw item name as-is.
+	// Used for stackable items' combined display, e.g. "1 Gold Coin" / "3 Gold Coins".
 	private static readonly Dictionary<string, string> _singularName = new()
 	{
 		{ "Coins", "Gold Coin" },
@@ -23,14 +22,20 @@ public static class ItemDatabase
 		{ "Coins", "Gold Coins" },
 	};
 
+	// Used for NON-stackable items' per-instance display, e.g. one "Bones"
+	// entry in the pile should read as "Bone" in the loot menu.
+	private static readonly Dictionary<string, string> _singleInstanceName = new()
+	{
+		{ "Bones", "Bone" },
+	};
+
 	public static bool IsStackable(string itemName)
 	{
 		return _stackable.TryGetValue(itemName, out bool stackable) && stackable;
 	}
 
-	// Returns the full display text for an item + quantity,
-	// e.g. "1 Gold Coin" or "3 Gold Coins". Non-stackable items
-	// just return their raw name, ignoring quantity.
+	// Full display text for a stackable item + quantity, e.g. "3 Gold Coins".
+	// Non-stackable items just return their raw name (unaffected by quantity).
 	public static string GetDisplayText(string itemName, int quantity)
 	{
 		if (!IsStackable(itemName))
@@ -43,5 +48,13 @@ public static class ItemDatabase
 			: _pluralName.GetValueOrDefault(itemName, itemName + "s");
 
 		return quantity + " " + name;
+	}
+
+	// Display name for ONE instance of a non-stackable item, e.g.
+	// "Bones" -> "Bone". Falls back to the raw item name if no override
+	// is defined, so new items work without needing an entry right away.
+	public static string GetSingleInstanceName(string itemName)
+	{
+		return _singleInstanceName.GetValueOrDefault(itemName, itemName);
 	}
 }

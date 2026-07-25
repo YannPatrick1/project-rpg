@@ -217,24 +217,27 @@ public partial class Player : CharacterBody3D
 	// "Coins" entries at once), or just the single entry for non-stackable items.
 	private void GrabItem(ILootable lootable, string itemName)
 	{
-		int count = 0;
+		int matchCount = 0;
 		foreach (string item in lootable.Items)
 		{
-			if (item == itemName) count++;
+			if (item == itemName) matchCount++;
 		}
 
+		// Stackable items grab everything at once; non-stackable items
+		// grab just one unit per click, leaving duplicates for next time.
+		int grabCount = ItemDatabase.IsStackable(itemName) ? matchCount : 1;
+
 		var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
-		bool added = inventory.AddItem(itemName, count);
+		bool added = inventory.AddItem(itemName, grabCount);
 
 		if (!added)
 		{
-			// Inventory full and this isn't an existing stack — leave it where it is.
 			return;
 		}
 
-		GD.Print("Looted: " + ItemDatabase.GetDisplayText(itemName, count));
+		GD.Print("Looted: " + ItemDatabase.GetDisplayText(itemName, grabCount));
 
-		for (int i = 0; i < count; i++)
+		for (int i = 0; i < grabCount; i++)
 		{
 			lootable.RemoveItem(itemName);
 		}
@@ -293,29 +296,39 @@ public partial class Player : CharacterBody3D
 		}
 	}
 
-	// Groups duplicate entries (e.g. three "Coins") into a single menu row
-	// with a combined display like "3 Gold Coins", instead of listing each
-	// one separately.
+	/// Stackable items get ONE combined row (e.g. "3 Gold Coins").
+	// Non-stackable items get a separate row per instance (e.g. "Bone",
+	// "Bone", "Bone" if there are 3), so each click grabs exactly one.
 	private void OpenLootMenu(ILootable lootable, Vector2 mousePos)
 	{
 		_activeLoot = lootable;
 		_lootMenu.Clear();
 		_lootMenuItemNames.Clear();
 
-		var seen = new HashSet<string>();
+		var stackableAlreadyAdded = new HashSet<string>();
+
 		foreach (string item in lootable.Items)
 		{
-			if (seen.Contains(item)) continue;
-			seen.Add(item);
-
-			int count = 0;
-			foreach (string i in lootable.Items)
+			if (ItemDatabase.IsStackable(item))
 			{
-				if (i == item) count++;
-			}
+				if (stackableAlreadyAdded.Contains(item)) continue;
+				stackableAlreadyAdded.Add(item);
 
-			_lootMenu.AddItem(ItemDatabase.GetDisplayText(item, count));
-			_lootMenuItemNames.Add(item);
+				int count = 0;
+				foreach (string i in lootable.Items)
+				{
+					if (i == item) count++;
+				}
+
+				_lootMenu.AddItem(ItemDatabase.GetDisplayText(item, count));
+				_lootMenuItemNames.Add(item);
+			}
+			else
+			{
+				// One row per instance — no dedup.
+				_lootMenu.AddItem(ItemDatabase.GetSingleInstanceName(item));
+				_lootMenuItemNames.Add(item);
+			}
 		}
 
 		_lootMenu.Position = (Vector2I)mousePos;
@@ -328,14 +341,16 @@ public partial class Player : CharacterBody3D
 
 		string itemName = _lootMenuItemNames[(int)index];
 
-		int count = 0;
+		int matchCount = 0;
 		foreach (string item in _activeLoot.Items)
 		{
-			if (item == itemName) count++;
+			if (item == itemName) matchCount++;
 		}
 
+		int grabCount = ItemDatabase.IsStackable(itemName) ? matchCount : 1;
+
 		var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
-		bool added = inventory.AddItem(itemName, count);
+		bool added = inventory.AddItem(itemName, grabCount);
 
 		if (!added)
 		{
@@ -343,9 +358,9 @@ public partial class Player : CharacterBody3D
 			return;
 		}
 
-		GD.Print("Looted: " + ItemDatabase.GetDisplayText(itemName, count));
+		GD.Print("Looted: " + ItemDatabase.GetDisplayText(itemName, grabCount));
 
-		for (int i = 0; i < count; i++)
+		for (int i = 0; i < grabCount; i++)
 		{
 			_activeLoot.RemoveItem(itemName);
 		}

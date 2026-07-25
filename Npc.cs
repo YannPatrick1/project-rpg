@@ -60,6 +60,8 @@ public partial class Npc : CharacterBody3D
 			{
 				newItems.Add("Coins");
 			}
+			GD.Print("Built loot list: " + string.Join(", ", newItems));
+			
 
 			LootPile existingPile = FindNearbyLootPile(GlobalPosition, 1.5f);
 
