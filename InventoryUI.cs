@@ -21,6 +21,11 @@ public partial class InventoryUI : Control
 
 		RefreshDisplay();
 	}
+	
+	public int GetSelectedIndex()
+	{
+		return _selectedIndex;
+	}
 
 	private void OnSlotClicked(int index)
 	{

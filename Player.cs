@@ -112,6 +112,7 @@ public partial class Player : CharacterBody3D
 	private void HandleClick(Vector2 mousePos, bool isRightClick)
 	{
 		string selectedItem = _inventoryUI.GetSelectedItem();
+		int selectedIndex = _inventoryUI.GetSelectedIndex();
 
 		var camera = _springArm.GetNode<Camera3D>("Camera3D");
 		Vector3 rayOrigin = camera.ProjectRayOrigin(mousePos);
@@ -141,7 +142,7 @@ public partial class Player : CharacterBody3D
 
 		if (selectedItem != null)
 		{
-			UseItemOn(selectedItem, collider);
+			UseItemOn(selectedItem, selectedIndex, collider);
 			_inventoryUI.ClearSelection();
 			return;
 		}
@@ -253,7 +254,7 @@ public partial class Player : CharacterBody3D
 		GD.Print("Nothing noteworthy happened");
 	}
 
-	private void UseItemOn(string itemName, GodotObject target)
+	private void UseItemOn(string itemName, int itemIndex, GodotObject target)
 	{
 		if (target is Chest chest)
 		{
@@ -274,7 +275,7 @@ public partial class Player : CharacterBody3D
 			{
 				chest.Open();
 				var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
-				inventory.RemoveItem(itemName);
+				inventory.RemoveItemAt(itemIndex);
 				GD.Print("The chest opened and magically consumed the key!");
 			}
 			else if (IsKeyItem(itemName))

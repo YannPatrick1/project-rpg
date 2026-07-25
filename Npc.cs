@@ -47,33 +47,57 @@ public partial class Npc : CharacterBody3D
 
 		if (LootPileScene != null)
 		{
-			var lootPile = LootPileScene.Instantiate<LootPile>();
-			lootPile.Items = new List<string>();
+			var newItems = new List<string>();
+			newItems.Add("Bones");
 
-			// Bones always drop.
-			lootPile.Items.Add("Bones");
-
-			// Key: 20% chance.
 			if (GD.Randf() < 0.20f)
 			{
-				lootPile.Items.Add("Key");
+				newItems.Add("Key");
 			}
 
-			// Coins: 100% chance, even 1/3 chance each of 1, 2, or 3.
 			int coinAmount = GD.RandRange(1, 3);
 			for (int i = 0; i < coinAmount; i++)
 			{
-				lootPile.Items.Add("Coins");
+				newItems.Add("Coins");
 			}
 
-			GetParent().AddChild(lootPile);
-			lootPile.GlobalPosition = GlobalPosition;
+			LootPile existingPile = FindNearbyLootPile(GlobalPosition, 1.5f);
+
+			if (existingPile != null)
+			{
+				foreach (string item in newItems)
+				{
+					existingPile.Items.Add(item);
+				}
+				GD.Print("Merged new loot into existing pile");
+			}
+			else
+			{
+				var lootPile = LootPileScene.Instantiate<LootPile>();
+				lootPile.Items = newItems;
+				GetParent().AddChild(lootPile);
+				lootPile.GlobalPosition = GlobalPosition;
+			}
 		}
 
-		// Instead of QueueFree(), "hide and disable" so we can respawn later.
 		Visible = false;
 		_collisionShape.SetDeferred(CollisionShape3D.PropertyName.Disabled, true);
 		_respawnTimer.Start();
+	}
+
+	// Looks for an existing loot pile within "radius" units of "position".
+	// Used so loot from a new death merges into a pile that's already there
+	// instead of spawning an overlapping duplicate.
+	private LootPile FindNearbyLootPile(Vector3 position, float radius)
+	{
+		foreach (Node node in GetTree().GetNodesInGroup("loot_piles"))
+		{
+			if (node is LootPile pile && pile.GlobalPosition.DistanceTo(position) <= radius)
+			{
+				return pile;
+			}
+		}
+		return null;
 	}
 
 	private void OnRespawnTimerTimeout()

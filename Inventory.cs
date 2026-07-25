@@ -22,6 +22,27 @@ public partial class Inventory : Node
 		if (index < 0 || index >= _quantities.Length) return 0;
 		return _quantities[index];
 	}
+	// Removes one unit from a SPECIFIC slot, regardless of what other
+	// slots might contain the same item name. Used when the player has
+	// selected a particular slot in the UI (e.g. one of two "Key" slots).
+	public bool RemoveItemAt(int index)
+	{
+		if (index < 0 || index >= SlotCount) return false;
+		if (_slots[index] == null) return false;
+
+		string itemName = _slots[index];
+		_quantities[index] -= 1;
+		GD.Print("Removed 1 " + itemName + " from slot " + index);
+
+		if (_quantities[index] <= 0)
+		{
+			_slots[index] = null;
+			_quantities[index] = 0;
+		}
+
+		EmitSignal(SignalName.InventoryChanged);
+		return true;
+	}
 
 	public bool AddItem(string itemName, int quantity = 1)
 	{
