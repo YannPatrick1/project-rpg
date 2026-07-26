@@ -45,8 +45,7 @@ public partial class Player : CharacterBody3D
 			velocity.Y = JumpVelocity;
 		}
 
-		Vector2 inputDir = Input.GetVector("ui_left", "ui_right", "ui_up", "ui_down");
-		Vector3 rawDirection = new Vector3(inputDir.X, 0, inputDir.Y);
+Vector2 inputDir = Input.GetVector("move_left", "move_right", "move_forward", "move_back");		Vector3 rawDirection = new Vector3(inputDir.X, 0, inputDir.Y);
 		Vector3 direction = rawDirection.Rotated(Vector3.Up, Mathf.DegToRad(_cameraYaw)).Normalized();
 
 		if (direction != Vector3.Zero)
@@ -174,11 +173,15 @@ public partial class Player : CharacterBody3D
 		}
 		else if (isRightClick && collider is LootPile lootPile2)
 		{
-			OpenLootMenu(lootPile2, mousePos);
-		}
-		else if (collider is Chest chest)
-		{
-			HandleChestClick(chest, isRightClick, mousePos);
+			float distance = GlobalPosition.DistanceTo(lootPile2.GlobalPosition);
+			if (distance < 3.0f)
+			{
+				OpenLootMenu(lootPile2, mousePos);
+			}
+			else
+			{
+				GD.Print("Too far away to pick that up.");
+			}
 		}
 	}
 
@@ -197,7 +200,15 @@ public partial class Player : CharacterBody3D
 
 		if (isRightClick)
 		{
-			OpenLootMenu(chest, mousePos);
+			float chestDistance = GlobalPosition.DistanceTo(chest.GlobalPosition);
+			if (chestDistance < 3.0f)
+			{
+				OpenLootMenu(chest, mousePos);
+			}
+			else
+			{
+				GD.Print("Too far away to pick that up.");
+			}
 			return;
 		}
 
