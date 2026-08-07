@@ -11,7 +11,6 @@ public partial class Player : CharacterBody3D
 	private InventoryUI _inventoryUI;
 
 	public const float Speed = 5.0f;
-	public const float JumpVelocity = 4.5f;
 
 	[Export] public float MouseSensitivity = 0.15f;
 	[Export] public float ZoomSpeed = 0.5f;
@@ -22,6 +21,18 @@ public partial class Player : CharacterBody3D
 
 	private float _cameraYaw = 0f;
 	private float _cameraPitch = -20f;
+
+	// --- Click-to-move state ---
+	private Vector3? _moveTarget = null;
+	private const float ArrivalDistance = 0.2f;
+
+	// Stuck detection: periodically check how far we've actually moved.
+	// If it's basically nothing (walked into a wall/obstacle), we cancel
+	// the move target as if we'd arrived, rather than staying stuck forever.
+	private const double StuckCheckInterval = 0.3;
+	private const float StuckDistanceThreshold = 0.05f;
+	private double _stuckCheckTimer = 0;
+	private Vector3 _stuckCheckPosition;
 
 	public override void _Ready()
 	{
@@ -40,19 +51,28 @@ public partial class Player : CharacterBody3D
 			velocity += GetGravity() * (float)delta;
 		}
 
-		if (Input.IsActionJustPressed("ui_accept") && IsOnFloor())
+		if (_moveTarget.HasValue)
 		{
-			velocity.Y = JumpVelocity;
-		}
+			Vector3 toTarget = _moveTarget.Value - GlobalPosition;
+			toTarget.Y = 0;
+			float distance = toTarget.Length();
 
-		Vector2 inputDir = Input.GetVector("move_left", "move_right", "move_forward", "move_back");		Vector3 rawDirection = new Vector3(inputDir.X, 0, inputDir.Y);
-		Vector3 direction = rawDirection.Rotated(Vector3.Up, Mathf.DegToRad(_cameraYaw)).Normalized();
+			if (distance < ArrivalDistance)
+			{
+				// Arrived.
+				velocity.X = 0;
+				velocity.Z = 0;
+				_moveTarget = null;
+			}
+			else
+			{
+				Vector3 moveDir = toTarget.Normalized();
+				velocity.X = moveDir.X * Speed;
+				velocity.Z = moveDir.Z * Speed;
+				LookAt(GlobalPosition + moveDir, Vector3.Up);
 
-		if (direction != Vector3.Zero)
-		{
-			velocity.X = direction.X * Speed;
-			velocity.Z = direction.Z * Speed;
-			LookAt(GlobalPosition + direction, Vector3.Up);
+				CheckIfStuck(delta);
+			}
 		}
 		else
 		{
@@ -64,6 +84,30 @@ public partial class Player : CharacterBody3D
 		MoveAndSlide();
 
 		_springArm.Rotation = new Vector3(Mathf.DegToRad(_cameraPitch), Mathf.DegToRad(_cameraYaw) - Rotation.Y, 0);
+	}
+
+	// Called every physics frame while walking toward a click-move target.
+	// Every StuckCheckInterval seconds, compares current position to where
+	// we were at the last check. If we've barely moved, something's
+	// blocking us (wall, chest, etc.) — cancel the target instead of
+	// grinding against it forever.
+	private void CheckIfStuck(double delta)
+	{
+		_stuckCheckTimer += delta;
+
+		if (_stuckCheckTimer >= StuckCheckInterval)
+		{
+			float movedDistance = GlobalPosition.DistanceTo(_stuckCheckPosition);
+
+			if (movedDistance < StuckDistanceThreshold)
+			{
+				GD.Print("Stuck on something — stopping here.");
+				_moveTarget = null;
+			}
+
+			_stuckCheckPosition = GlobalPosition;
+			_stuckCheckTimer = 0;
+		}
 	}
 
 	public override void _UnhandledInput(InputEvent @event)
@@ -179,6 +223,16 @@ public partial class Player : CharacterBody3D
 		{
 			HandleChestClick(chest, isRightClick, mousePos);
 		}
+		else if (!isRightClick)
+		{
+			// Nothing interactive was clicked — treat it as a move command.
+			// Works for clicks on the ground, or any other plain-collision
+			// surface without special handling.
+			Vector3 hitPosition = (Vector3)result["position"];
+			_moveTarget = hitPosition;
+			_stuckCheckPosition = GlobalPosition;
+			_stuckCheckTimer = 0;
+		}
 	}
 
 	private void HandleChestClick(Chest chest, bool isRightClick, Vector2 mousePos)
@@ -216,27 +270,24 @@ public partial class Player : CharacterBody3D
 	// "Coins" entries at once), or just the single entry for non-stackable items.
 	private void GrabItem(ILootable lootable, string itemName)
 	{
-		int matchCount = 0;
+		int count = 0;
 		foreach (string item in lootable.Items)
 		{
-			if (item == itemName) matchCount++;
+			if (item == itemName) count++;
 		}
 
-		// Stackable items grab everything at once; non-stackable items
-		// grab just one unit per click, leaving duplicates for next time.
-		int grabCount = ItemDatabase.IsStackable(itemName) ? matchCount : 1;
-
 		var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
-		bool added = inventory.AddItem(itemName, grabCount);
+		bool added = inventory.AddItem(itemName, count);
 
 		if (!added)
 		{
+			// Inventory full and this isn't an existing stack — leave it where it is.
 			return;
 		}
 
-		GD.Print("Looted: " + ItemDatabase.GetDisplayText(itemName, grabCount));
+		GD.Print("Looted: " + ItemDatabase.GetDisplayText(itemName, count));
 
-		for (int i = 0; i < grabCount; i++)
+		for (int i = 0; i < count; i++)
 		{
 			lootable.RemoveItem(itemName);
 		}
@@ -295,39 +346,29 @@ public partial class Player : CharacterBody3D
 		}
 	}
 
-	/// Stackable items get ONE combined row (e.g. "3 Gold Coins").
-	// Non-stackable items get a separate row per instance (e.g. "Bone",
-	// "Bone", "Bone" if there are 3), so each click grabs exactly one.
+	// Groups duplicate entries (e.g. three "Coins") into a single menu row
+	// with a combined display like "3 Gold Coins", instead of listing each
+	// one separately.
 	private void OpenLootMenu(ILootable lootable, Vector2 mousePos)
 	{
 		_activeLoot = lootable;
 		_lootMenu.Clear();
 		_lootMenuItemNames.Clear();
 
-		var stackableAlreadyAdded = new HashSet<string>();
-
+		var seen = new HashSet<string>();
 		foreach (string item in lootable.Items)
 		{
-			if (ItemDatabase.IsStackable(item))
-			{
-				if (stackableAlreadyAdded.Contains(item)) continue;
-				stackableAlreadyAdded.Add(item);
+			if (seen.Contains(item)) continue;
+			seen.Add(item);
 
-				int count = 0;
-				foreach (string i in lootable.Items)
-				{
-					if (i == item) count++;
-				}
-
-				_lootMenu.AddItem(ItemDatabase.GetDisplayText(item, count));
-				_lootMenuItemNames.Add(item);
-			}
-			else
+			int count = 0;
+			foreach (string i in lootable.Items)
 			{
-				// One row per instance — no dedup.
-				_lootMenu.AddItem(ItemDatabase.GetSingleInstanceName(item));
-				_lootMenuItemNames.Add(item);
+				if (i == item) count++;
 			}
+
+			_lootMenu.AddItem(ItemDatabase.GetDisplayText(item, count));
+			_lootMenuItemNames.Add(item);
 		}
 
 		_lootMenu.Position = (Vector2I)mousePos;
@@ -338,28 +379,16 @@ public partial class Player : CharacterBody3D
 	{
 		if (_activeLoot == null) return;
 
-		if (_activeLoot is Node3D lootNode)
-		{
-			float distance = GlobalPosition.DistanceTo(lootNode.GlobalPosition);
-			if (distance >= 3.0f)
-			{
-				GD.Print("Too far away to pick that up.");
-				return;
-			}
-		}
+		string itemName = _lootMenuItemNames[(int)index];
 
-	string itemName = _lootMenuItemNames[(int)index];
-
-		int matchCount = 0;
+		int count = 0;
 		foreach (string item in _activeLoot.Items)
 		{
-			if (item == itemName) matchCount++;
+			if (item == itemName) count++;
 		}
 
-		int grabCount = ItemDatabase.IsStackable(itemName) ? matchCount : 1;
-
 		var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
-		bool added = inventory.AddItem(itemName, grabCount);
+		bool added = inventory.AddItem(itemName, count);
 
 		if (!added)
 		{
@@ -367,9 +396,9 @@ public partial class Player : CharacterBody3D
 			return;
 		}
 
-		GD.Print("Looted: " + ItemDatabase.GetDisplayText(itemName, grabCount));
+		GD.Print("Looted: " + ItemDatabase.GetDisplayText(itemName, count));
 
-		for (int i = 0; i < grabCount; i++)
+		for (int i = 0; i < count; i++)
 		{
 			_activeLoot.RemoveItem(itemName);
 		}
