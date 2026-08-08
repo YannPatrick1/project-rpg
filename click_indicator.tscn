@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://c3d8dvdbsu3m6"]
+
+[ext_resource type="Script" uid="uid://dk1uomjvltevy" path="res://ClickIndicator.cs" id="1_uty8l"]
+
+[node name="ClickIndicator" type="Label3D" unique_id=1014781106]
+billboard = 1
+no_depth_test = true
+text = "X"
+font_size = 64
+script = ExtResource("1_uty8l")

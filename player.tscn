@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://dy8uokaseuihe"]
 
 [ext_resource type="Script" uid="uid://rbqrwgoaavdt" path="res://Player.cs" id="1_4flbx"]
+[ext_resource type="PackedScene" uid="uid://c3d8dvdbsu3m6" path="res://click_indicator.tscn" id="2_onrkg"]
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_rlqx7"]
 
@@ -8,6 +9,7 @@
 
 [node name="Player" type="CharacterBody3D" unique_id=1712078198]
 script = ExtResource("1_4flbx")
+ClickIndicatorScene = ExtResource("2_onrkg")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1002286774]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
