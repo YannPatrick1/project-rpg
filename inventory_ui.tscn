@@ -2,6 +2,8 @@
 
 [ext_resource type="PackedScene" uid="uid://cu8fytn3018kk" path="res://inventory_slot.tscn" id="1_5v8q7"]
 [ext_resource type="Script" uid="uid://dgvg0itdapu4h" path="res://InventoryUI.cs" id="1_gf3dx"]
+[ext_resource type="Script" uid="uid://bkaen7bkcol04" path="res://EquipmentUI.cs" id="3_34y5v"]
+[ext_resource type="PackedScene" uid="uid://dj37lmf0v2pfs" path="res://equipment/EquipmentSlotUI.tscn" id="4_r57pj"]
 
 [node name="InventoryUI" type="Control" unique_id=927017573]
 layout_mode = 3
@@ -12,6 +14,19 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("1_gf3dx")
+
+[node name="TabButtons" type="HBoxContainer" parent="." unique_id=1202881056]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="InventoryButton" type="Button" parent="TabButtons" unique_id=1016334874]
+layout_mode = 2
+text = "Inventory"
+
+[node name="EquipmentButton" type="Button" parent="TabButtons" unique_id=773060243]
+layout_mode = 2
+text = "Equipment"
 
 [node name="GridContainer" type="GridContainer" parent="." unique_id=519167679]
 layout_mode = 1
@@ -72,4 +87,60 @@ layout_mode = 2
 layout_mode = 2
 
 [node name="InventorySlot16" parent="GridContainer" unique_id=1839892239 instance=ExtResource("1_5v8q7")]
+layout_mode = 2
+
+[node name="EquipmentPanel" type="Control" parent="." unique_id=1533964066]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("3_34y5v")
+
+[node name="GridContainer" type="GridContainer" parent="EquipmentPanel" unique_id=1562003934]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+columns = 3
+
+[node name="empty" type="Control" parent="EquipmentPanel/GridContainer" unique_id=1177151044]
+layout_mode = 2
+
+[node name="EquipmentSlotUI" parent="EquipmentPanel/GridContainer" unique_id=876148445 instance=ExtResource("4_r57pj")]
+layout_mode = 2
+
+[node name="empty2" type="Control" parent="EquipmentPanel/GridContainer" unique_id=1415693205]
+layout_mode = 2
+
+[node name="EquipmentSlotUI2" parent="EquipmentPanel/GridContainer" unique_id=987956009 instance=ExtResource("4_r57pj")]
+layout_mode = 2
+Slot = 5
+
+[node name="EquipmentSlotUI3" parent="EquipmentPanel/GridContainer" unique_id=502896832 instance=ExtResource("4_r57pj")]
+layout_mode = 2
+Slot = 1
+
+[node name="EquipmentSlotUI4" parent="EquipmentPanel/GridContainer" unique_id=1341275694 instance=ExtResource("4_r57pj")]
+layout_mode = 2
+Slot = 4
+
+[node name="empty3" type="Control" parent="EquipmentPanel/GridContainer" unique_id=41141680]
+layout_mode = 2
+
+[node name="EquipmentSlotUI7" parent="EquipmentPanel/GridContainer" unique_id=704963125 instance=ExtResource("4_r57pj")]
+layout_mode = 2
+Slot = 2
+
+[node name="empty4" type="Control" parent="EquipmentPanel/GridContainer" unique_id=753535650]
+layout_mode = 2
+
+[node name="empty5" type="Control" parent="EquipmentPanel/GridContainer" unique_id=1800739273]
+layout_mode = 2
+
+[node name="EquipmentSlotUI5" parent="EquipmentPanel/GridContainer" unique_id=1787167820 instance=ExtResource("4_r57pj")]
+layout_mode = 2
+Slot = 3
+
+[node name="empty6" type="Control" parent="EquipmentPanel/GridContainer" unique_id=2106921300]
 layout_mode = 2

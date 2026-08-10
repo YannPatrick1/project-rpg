@@ -6,7 +6,9 @@ public partial class Chest : StaticBody3D, ILootable
 	[Export] public string RequiredKeyName = "Key";
 	[Export] public bool IsOpen = false;
 
-	public List<string> Items { get; set; } = new List<string> { "Gold", "Gem" };
+	// Dull Sword is a 100% guaranteed drop -- it's just always in the list,
+	// no randomness involved (unlike the NPC's chance-based Key drop).
+	public List<string> Items { get; set; } = new List<string> { "Dull Sword" };
 
 	private MeshInstance3D _mesh;
 

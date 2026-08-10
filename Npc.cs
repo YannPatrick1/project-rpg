@@ -3,47 +3,36 @@ using System.Collections.Generic;
 
 public partial class Npc : CharacterBody3D
 {
-	public enum ElementType
-{
-	None,
-	Fire,
-	Water,
-	Earth,
-	Air
-}
+	[ExportGroup("Identity")]
+	[Export] public string NpcName = "Goblin";
 
-[ExportGroup("Identity")]
-[Export] public string NpcName = "Goblin";
+	[ExportGroup("Core Stats")]
+	[Export] public int MaxHealth = 3;
+	[Export] public int Strength = 1;
+	[Export] public int Defense = 1;
+	[Export] public int RangeStrength = 1;
+	[Export] public int Agility = 1;
+	[Export] public int Magic = 1;
+	[Export] public int Resistance = 1;
+	[Export] public ElementType Element = ElementType.None;
 
-[ExportGroup("Core Stats")]
-[Export] public int MaxHealth = 3;
-[Export] public int Strength = 1;
-[Export] public int Defense = 1;
-[Export] public int RangeStrength = 1;
-[Export] public int Agility = 1;
-[Export] public int Magic = 1;
-[Export] public int Resistance = 1;
-[Export] public ElementType Element = ElementType.None;
+	[ExportGroup("Attack")]
+	[Export] public float MeleeAttackRange = 3.0f;
+	[Export] public float ProjectileAttackRange = 10.0f;
+	[Export] public bool CanAttackMelee = true;
+	[Export] public bool CanAttackRange = false;
+	[Export] public bool CanAttackMagic = false;
 
-[ExportGroup("Attack")]
-[Export] public float MeleeAttackRange = 3.0f;
-[Export] public float ProjectileAttackRange = 10.0f;
-[Export] public bool CanAttackMelee = true;
-[Export] public bool CanAttackRange = false;
-[Export] public bool CanAttackMagic = false;
+	[ExportGroup("Loot")]
+	[Export] public PackedScene KeyPickupScene;
+	[Export] public PackedScene LootPileScene;
 
-[ExportGroup("Loot")]
-[Export]
-public PackedScene KeyPickupScene;
-[Export]
-public PackedScene LootPileScene;
-
-private int _currentHealth;
-private bool _isDead = false;
-private Vector3 _spawnPosition;
-private Timer _respawnTimer;
-private CollisionShape3D _collisionShape;
-private MeshInstance3D _meshInstance;
+	private int _currentHealth;
+	private bool _isDead = false;
+	private Vector3 _spawnPosition;
+	private Timer _respawnTimer;
+	private CollisionShape3D _collisionShape;
+	private MeshInstance3D _meshInstance;
 
 	public override void _Ready()
 	{
@@ -89,7 +78,6 @@ private MeshInstance3D _meshInstance;
 				newItems.Add("Coins");
 			}
 			GD.Print("Built loot list: " + string.Join(", ", newItems));
-			
 
 			LootPile existingPile = FindNearbyLootPile(GlobalPosition, 1.5f);
 

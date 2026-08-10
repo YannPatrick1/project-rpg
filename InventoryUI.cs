@@ -6,11 +6,21 @@ public partial class InventoryUI : Control
 	private Inventory _inventory;
 	private int _selectedIndex = -1;
 
+	private Control _equipmentPanel;
+	private Button _inventoryButton;
+	private Button _equipmentButton;
+
 	public override void _Ready()
 	{
 		_grid = GetNode<GridContainer>("GridContainer");
 		_inventory = GetNode<Inventory>("/root/World/PlayerInventory");
 		_inventory.InventoryChanged += RefreshDisplay;
+
+		_equipmentPanel = GetNode<Control>("EquipmentPanel");
+		_inventoryButton = GetNode<Button>("TabButtons/InventoryButton");
+		_equipmentButton = GetNode<Button>("TabButtons/EquipmentButton");
+		_inventoryButton.Pressed += ShowInventoryTab;
+		_equipmentButton.Pressed += ShowEquipmentTab;
 
 		for (int i = 0; i < _grid.GetChildCount(); i++)
 		{
@@ -20,8 +30,23 @@ public partial class InventoryUI : Control
 		}
 
 		RefreshDisplay();
+		ShowInventoryTab();
 	}
-	
+
+	private void ShowInventoryTab()
+	{
+		_grid.Visible = true;
+		_equipmentPanel.Visible = false;
+		ClearSelection();
+	}
+
+	private void ShowEquipmentTab()
+	{
+		_grid.Visible = false;
+		_equipmentPanel.Visible = true;
+		ClearSelection();
+	}
+
 	public int GetSelectedIndex()
 	{
 		return _selectedIndex;

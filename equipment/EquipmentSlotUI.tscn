@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://dj37lmf0v2pfs"]
+
+[ext_resource type="Script" uid="uid://keilwwkb1iec" path="res://EquipmentSlotUI.cs" id="1_axp16"]
+
+[node name="EquipmentSlotUI" type="Panel" unique_id=876148445]
+custom_minimum_size = Vector2(64, 64)
+offset_right = 40.0
+offset_bottom = 40.0
+script = ExtResource("1_axp16")
+
+[node name="Label" type="Label" parent="." unique_id=168802119]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+horizontal_alignment = 1
+vertical_alignment = 1

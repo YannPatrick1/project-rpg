@@ -9,6 +9,7 @@ public static class ItemDatabase
 		{ "Bones", false },
 		{ "Gold", false },
 		{ "Gem", false },
+		{ "Dull Sword", false },
 	};
 
 	// Used for stackable items' combined display, e.g. "1 Gold Coin" / "3 Gold Coins".
