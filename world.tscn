@@ -6,7 +6,7 @@
 [ext_resource type="PackedScene" uid="uid://d4nvxr7w3h3x2" path="res://inventory_ui.tscn" id="4_aqk2v"]
 [ext_resource type="PackedScene" uid="uid://5shs8doqt1f4" path="res://chest.tscn" id="5_036b0"]
 [ext_resource type="Script" uid="uid://56asuuvis7m6" path="res://PlayerStats.cs" id="6_gbfbk"]
-[ext_resource type="Script" uid="uid://d1lqo4jyvulyb" path="res://PlayerEquipment.cs" id="7_ioo17"]
+[ext_resource type="Script" uid="uid://bxcg4fsx70a2s" path="res://Equipment.cs" id="7_wse8f"]
 [ext_resource type="Script" uid="uid://bx04vk4hu8qhn" path="res://EquipmentDatabase.cs" id="8_wse8f"]
 [ext_resource type="Script" uid="uid://bu2ng2he8w8xd" path="res://EquipmentData.cs" id="9_ioo17"]
 [ext_resource type="Resource" uid="uid://0o7r0xgvdpsa" path="res://equipment/Dull_Sword.tres" id="10_wse8f"]
@@ -59,7 +59,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1, -4)
 script = ExtResource("6_gbfbk")
 
 [node name="PlayerEquipment" type="Node" parent="." unique_id=1865042074]
-script = ExtResource("7_ioo17")
+script = ExtResource("7_wse8f")
 
 [node name="EquipmentDatabase" type="Node" parent="." unique_id=1704149469]
 script = ExtResource("8_wse8f")

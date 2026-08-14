@@ -17,8 +17,10 @@ script = ExtResource("1_gf3dx")
 
 [node name="TabButtons" type="HBoxContainer" parent="." unique_id=1202881056]
 layout_mode = 0
-offset_right = 40.0
-offset_bottom = 40.0
+offset_left = 925.0
+offset_top = 325.0
+offset_right = 1105.0
+offset_bottom = 365.0
 
 [node name="InventoryButton" type="Button" parent="TabButtons" unique_id=1016334874]
 layout_mode = 2
@@ -96,12 +98,15 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 script = ExtResource("3_34y5v")
 
 [node name="GridContainer" type="GridContainer" parent="EquipmentPanel" unique_id=1562003934]
 layout_mode = 0
-offset_right = 40.0
-offset_bottom = 40.0
+offset_left = 909.5
+offset_top = 375.0
+offset_right = 1109.5
+offset_bottom = 643.0
 columns = 3
 
 [node name="empty" type="Control" parent="EquipmentPanel/GridContainer" unique_id=1177151044]
