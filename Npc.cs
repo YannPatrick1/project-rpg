@@ -1,7 +1,7 @@
 using Godot;
 using System.Collections.Generic;
 
-public partial class Npc : CharacterBody3D
+public partial class Npc : CharacterBody3D, IExaminable
 {
 	[ExportGroup("Identity")]
 	[Export] public string NpcName = "Goblin";
@@ -126,5 +126,10 @@ public partial class Npc : CharacterBody3D
 		GlobalPosition = _spawnPosition;
 		Visible = true;
 		_collisionShape.SetDeferred(CollisionShape3D.PropertyName.Disabled, false);
+	}
+
+	public string GetExamineText()
+	{
+		return $"{NpcName}. It eyes you warily, deciding whether you're worth the trouble.";
 	}
 }

@@ -1,7 +1,7 @@
 using Godot;
 using System.Collections.Generic;
 
-public partial class LootPile : Area3D, ILootable
+public partial class LootPile : Area3D, ILootable, IExaminable
 {
 	public List<string> Items { get; set; } = new List<string>();
 
@@ -18,5 +18,10 @@ public partial class LootPile : Area3D, ILootable
 		{
 			QueueFree();
 		}
+	}
+
+	public string GetExamineText()
+	{
+		return "A scattered pile of loot, dropped by something that isn't getting back up.";
 	}
 }

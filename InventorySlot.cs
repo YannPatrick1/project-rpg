@@ -5,6 +5,9 @@ public partial class InventorySlot : Panel
 	[Signal]
 	public delegate void SlotClickedEventHandler(int index);
 
+	[Signal]
+	public delegate void SlotRightClickedEventHandler(int index);
+
 	private Label _label;
 	private int _index;
 	private StyleBoxFlat _normalStyle;
@@ -45,9 +48,16 @@ public partial class InventorySlot : Panel
 
 	public override void _GuiInput(InputEvent @event)
 	{
-		if (@event is InputEventMouseButton mouseButton && mouseButton.Pressed && mouseButton.ButtonIndex == MouseButton.Left)
+		if (@event is InputEventMouseButton mouseButton && mouseButton.Pressed)
 		{
-			EmitSignal(SignalName.SlotClicked, _index);
+			if (mouseButton.ButtonIndex == MouseButton.Left)
+			{
+				EmitSignal(SignalName.SlotClicked, _index);
+			}
+			else if (mouseButton.ButtonIndex == MouseButton.Right)
+			{
+				EmitSignal(SignalName.SlotRightClicked, _index);
+			}
 		}
 	}
 }

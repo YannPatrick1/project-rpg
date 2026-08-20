@@ -1,7 +1,7 @@
 using Godot;
 using System.Collections.Generic;
 
-public partial class Chest : StaticBody3D, ILootable
+public partial class Chest : StaticBody3D, ILootable, IExaminable
 {
 	[Export] public string RequiredKeyName = "Key";
 	[Export] public bool IsOpen = false;
@@ -28,5 +28,23 @@ public partial class Chest : StaticBody3D, ILootable
 	public void RemoveItem(string itemName)
 	{
 		Items.Remove(itemName);
+	}
+
+	// Three distinct states, each with its own line: closed, open with
+	// loot still inside, and open-but-empty (looted out). Order of checks
+	// matters -- IsOpen must be checked before Items.Count.
+	public string GetExamineText()
+	{
+		if (!IsOpen)
+		{
+			return "A sturdy wooden chest, locked tight. Whatever's inside will have to wait for the right key.";
+		}
+
+		if (Items.Count > 0)
+		{
+			return "An open chest, its lid thrown back. Something's still glinting inside.";
+		}
+
+		return "An open chest, picked clean. Nothing left in here but dust and disappointment.";
 	}
 }

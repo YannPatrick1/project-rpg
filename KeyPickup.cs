@@ -1,6 +1,6 @@
 using Godot;
 
-public partial class KeyPickup : Area3D
+public partial class KeyPickup : Area3D, IExaminable
 {
 	public void PickUp()
 	{
@@ -15,5 +15,10 @@ public partial class KeyPickup : Area3D
 
 		GD.Print("Added Key to slot 0");
 		QueueFree();
+	}
+
+	public string GetExamineText()
+	{
+		return "A small iron key, glinting on the ground. Someone's going to miss this.";
 	}
 }

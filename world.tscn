@@ -64,3 +64,5 @@ script = ExtResource("7_wse8f")
 [node name="EquipmentDatabase" type="Node" parent="." unique_id=1704149469]
 script = ExtResource("8_wse8f")
 Entries = Array[ExtResource("9_ioo17")]([ExtResource("10_wse8f")])
+
+[node name="ItemContextMenu" type="PopupMenu" parent="." unique_id=1487027277]

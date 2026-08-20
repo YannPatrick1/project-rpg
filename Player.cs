@@ -5,9 +5,8 @@ using System.Collections.Generic;
 public partial class Player : CharacterBody3D
 {
 	private SpringArm3D _springArm;
-	private PopupMenu _lootMenu;
-	private ILootable _activeLoot;
-	private List<string> _lootMenuItemNames = new();
+	private PopupMenu _contextMenu;
+	private List<Action> _contextMenuActions = new();
 	private InventoryUI _inventoryUI;
 
 	public const float Speed = 5.0f;
@@ -37,31 +36,23 @@ public partial class Player : CharacterBody3D
 	private Vector3? _moveTarget = null;
 	private const float ArrivalDistance = 0.2f;
 
-	// Stuck detection: periodically check how far we've actually moved.
-	// If it's basically nothing (walked into a wall/obstacle), we cancel
-	// the move target as if we'd arrived, rather than staying stuck forever.
 	private const double StuckCheckInterval = 0.3;
 	private const float StuckDistanceThreshold = 0.05f;
 	private double _stuckCheckTimer = 0;
 	private Vector3 _stuckCheckPosition;
 
-	// --- Walk-then-interact state (one-shot actions: open chest, grab loot, etc.) ---
-	// Set alongside _moveTarget. Checked every physics frame while moving so
-	// the action fires as soon as we're in range, not only once we'd
-	// otherwise "arrive" exactly at the target's position.
 	private Action _pendingAction = null;
 	private Vector3 _pendingActionPosition;
 	private float _pendingActionRange;
 
-	// --- Combat state (recurring auto-attack, not a one-shot pending action) ---
 	private Npc _attackTarget = null;
 	private double _attackCooldown = 0;
 
 	public override void _Ready()
 	{
 		_springArm = GetNode<SpringArm3D>("SpringArm3D");
-		_lootMenu = GetNode<PopupMenu>("/root/World/LootMenu");
-		_lootMenu.IndexPressed += OnLootMenuIndexPressed;
+		_contextMenu = GetNode<PopupMenu>("/root/World/LootMenu");
+		_contextMenu.IndexPressed += OnContextMenuIndexPressed;
 		_inventoryUI = GetNode<InventoryUI>("/root/World/InventoryUI");
 	}
 
@@ -105,7 +96,6 @@ public partial class Player : CharacterBody3D
 
 			if (distance < ArrivalDistance)
 			{
-				// Arrived.
 				velocity.X = 0;
 				velocity.Z = 0;
 				_moveTarget = null;
@@ -138,15 +128,12 @@ public partial class Player : CharacterBody3D
 		_springArm.Rotation = new Vector3(Mathf.DegToRad(_cameraPitch), Mathf.DegToRad(_cameraYaw) - Rotation.Y, 0);
 	}
 
-	// Handles walking toward an attack target and auto-attacking on a timer
-	// once in range. Runs every physics frame whenever _attackTarget is set.
 	private void ProcessCombat(double delta)
 	{
 		if (_attackTarget == null) return;
 
 		if (!IsInstanceValid(_attackTarget) || !_attackTarget.Visible)
 		{
-			// Target died (Npc.Die() hides it) or was otherwise removed.
 			_attackTarget = null;
 			return;
 		}
@@ -155,12 +142,10 @@ public partial class Player : CharacterBody3D
 
 		if (distance > InteractRange)
 		{
-			// Not in range yet (or anymore) — keep walking toward it.
 			_moveTarget = _attackTarget.GlobalPosition;
 			return;
 		}
 
-		// In range: stop moving, face the target, tick the attack timer.
 		_moveTarget = null;
 		Vector3 lookTarget = new Vector3(_attackTarget.GlobalPosition.X, GlobalPosition.Y, _attackTarget.GlobalPosition.Z);
 		if (lookTarget != GlobalPosition)
@@ -176,11 +161,6 @@ public partial class Player : CharacterBody3D
 		}
 	}
 
-	// Called every physics frame while walking toward a click-move target.
-	// Every StuckCheckInterval seconds, compares current position to where
-	// we were at the last check. If we've barely moved, something's
-	// blocking us (wall, chest, etc.) — cancel the target instead of
-	// grinding against it forever.
 	private void CheckIfStuck(double delta)
 	{
 		_stuckCheckTimer += delta;
@@ -220,7 +200,7 @@ public partial class Player : CharacterBody3D
 	{
 		_pendingAction = null;
 		_attackTarget = npc;
-		_attackCooldown = 0; // attack immediately once in range
+		_attackCooldown = 0;
 		_moveTarget = npc.GlobalPosition;
 		ResetStuckCheck();
 	}
@@ -256,9 +236,6 @@ public partial class Player : CharacterBody3D
 
 	private void HandleClick(Vector2 mousePos, bool isRightClick)
 	{
-		// Any new click cancels whatever the player was previously doing
-		// (auto-attacking, walking to loot, etc.) — the branches below set
-		// these back if the new click starts a new one of these.
 		_attackTarget = null;
 		_pendingAction = null;
 
@@ -303,17 +280,11 @@ public partial class Player : CharacterBody3D
 		if (!isRightClick && collider is KeyPickup keyPickup)
 		{
 			SpawnClickIndicator(hitPosition, InteractIndicatorColor);
-
-			Vector3 targetPos = keyPickup.GlobalPosition;
-			_moveTarget = targetPos;
-			_pendingActionPosition = targetPos;
-			_pendingActionRange = InteractRange;
-			_pendingAction = () =>
-			{
-				if (!IsInstanceValid(keyPickup)) return;
-				keyPickup.PickUp();
-			};
-			ResetStuckCheck();
+			WalkToAndPickUpKey(keyPickup);
+		}
+		else if (isRightClick && collider is KeyPickup keyPickupMenu)
+		{
+			OpenKeyPickupContextMenu(keyPickupMenu, mousePos);
 		}
 		else if (!isRightClick && collider is LootPile lootPile && lootPile.Items.Count > 0)
 		{
@@ -333,14 +304,16 @@ public partial class Player : CharacterBody3D
 		}
 		else if (isRightClick && collider is LootPile lootPile2)
 		{
-			// Right-click context menu opens immediately, no walking first —
-			// matches OSRS right-click-menu convention.
-			OpenLootMenu(lootPile2, mousePos);
+			OpenLootContextMenu(lootPile2, mousePos);
 		}
 		else if (!isRightClick && collider is Npc npc)
 		{
 			SpawnClickIndicator(hitPosition, InteractIndicatorColor);
 			StartAttacking(npc);
+		}
+		else if (isRightClick && collider is Npc npcMenu)
+		{
+			OpenNpcContextMenu(npcMenu, mousePos);
 		}
 		else if (collider is Chest chest)
 		{
@@ -348,7 +321,6 @@ public partial class Player : CharacterBody3D
 		}
 		else if (!isRightClick)
 		{
-			// Nothing interactive was clicked — treat it as a plain move command.
 			SpawnClickIndicator(hitPosition, WalkIndicatorColor);
 			_moveTarget = hitPosition;
 			ResetStuckCheck();
@@ -359,7 +331,11 @@ public partial class Player : CharacterBody3D
 	{
 		if (!chest.IsOpen)
 		{
-			if (!isRightClick)
+			if (isRightClick)
+			{
+				OpenChestClosedContextMenu(chest, mousePos, hitPosition);
+			}
+			else
 			{
 				SpawnClickIndicator(hitPosition, InteractIndicatorColor);
 				GD.Print("I could loot this chest with the right key!");
@@ -367,12 +343,16 @@ public partial class Player : CharacterBody3D
 			return;
 		}
 
-		if (chest.Items.Count == 0) return;
-
 		if (isRightClick)
 		{
-			// Right-click context menu opens immediately, no walking first.
-			OpenLootMenu(chest, mousePos);
+			OpenChestOpenContextMenu(chest, mousePos);
+			return;
+		}
+
+		if (chest.Items.Count == 0)
+		{
+			SpawnClickIndicator(hitPosition, InteractIndicatorColor);
+			GD.Print("There's nothing left to loot here.");
 			return;
 		}
 
@@ -387,6 +367,20 @@ public partial class Player : CharacterBody3D
 			if (!IsInstanceValid(chest) || chest.Items.Count == 0) return;
 			string topItem = chest.Items[0];
 			GrabItem(chest, topItem);
+		};
+		ResetStuckCheck();
+	}
+
+	private void WalkToAndPickUpKey(KeyPickup keyPickup)
+	{
+		Vector3 targetPos = keyPickup.GlobalPosition;
+		_moveTarget = targetPos;
+		_pendingActionPosition = targetPos;
+		_pendingActionRange = InteractRange;
+		_pendingAction = () =>
+		{
+			if (!IsInstanceValid(keyPickup)) return;
+			keyPickup.PickUp();
 		};
 		ResetStuckCheck();
 	}
@@ -406,7 +400,6 @@ public partial class Player : CharacterBody3D
 
 		if (!added)
 		{
-			// Inventory full and this isn't an existing stack — leave it where it is.
 			return;
 		}
 
@@ -419,22 +412,16 @@ public partial class Player : CharacterBody3D
 	}
 
 	// Any item name starting with "Key" counts as a key-type item.
-	// Future keys (Key2, Key3, ...) are automatically covered by this check.
 	private bool IsKeyItem(string itemName)
 	{
 		return itemName != null && itemName.StartsWith("Key");
 	}
 
-	// Single source of truth for the generic "used something on something
-	// it doesn't interact with" message. Change the wording here only.
 	private void PrintDefaultUseMessage()
 	{
 		GD.Print("Nothing noteworthy happened");
 	}
 
-	// Walks the player to the target first; the actual key/chest logic only
-	// runs once within InteractRange (see the pending-action check in
-	// _PhysicsProcess).
 	private void UseItemOn(string itemName, int itemIndex, GodotObject target)
 	{
 		if (target is Chest chest)
@@ -477,14 +464,39 @@ public partial class Player : CharacterBody3D
 		}
 	}
 
-	// Groups duplicate entries (e.g. three "Coins") into a single menu row
-	// with a combined display like "3 Gold Coins", instead of listing each
-	// one separately.
-	private void OpenLootMenu(ILootable lootable, Vector2 mousePos)
+	// --- Generic right-click context menu helpers ---
+	// Any world object builds a menu out of these two calls: add whatever
+	// options make sense, then open it. Each option carries its own Action,
+	// so the menu system doesn't need to know what a Chest or an Npc even
+	// is -- makes it easy to hook up doors, NPCs with dialogue, etc. later.
+
+	private void AddContextMenuOption(string label, Action action)
 	{
-		_activeLoot = lootable;
-		_lootMenu.Clear();
-		_lootMenuItemNames.Clear();
+		_contextMenu.AddItem(label);
+		_contextMenuActions.Add(action);
+	}
+
+	private void OpenContextMenu(Vector2 mousePos)
+	{
+		_contextMenu.Position = (Vector2I)mousePos;
+		_contextMenu.Popup();
+	}
+
+	private void OnContextMenuIndexPressed(long index)
+	{
+		if (index < 0 || index >= _contextMenuActions.Count) return;
+		var action = _contextMenuActions[(int)index];
+		_contextMenuActions.Clear();
+		action?.Invoke();
+	}
+
+	// Groups duplicate entries (e.g. three "Coins") into a single menu row
+	// with a combined display like "3 Gold Coins". Adds an "Examine" option
+	// automatically if the lootable also implements IExaminable.
+	private void OpenLootContextMenu(ILootable lootable, Vector2 mousePos)
+	{
+		_contextMenu.Clear();
+		_contextMenuActions.Clear();
 
 		var seen = new HashSet<string>();
 		foreach (string item in lootable.Items)
@@ -498,22 +510,22 @@ public partial class Player : CharacterBody3D
 				if (i == item) count++;
 			}
 
-			_lootMenu.AddItem(ItemDatabase.GetDisplayText(item, count));
-			_lootMenuItemNames.Add(item);
+			string itemName = item;
+			AddContextMenuOption(ItemDatabase.GetDisplayText(item, count), () => LootSpecificItem(lootable, itemName));
 		}
 
-		_lootMenu.Position = (Vector2I)mousePos;
-		_lootMenu.Popup();
+		if (lootable is IExaminable examinable)
+		{
+			AddContextMenuOption("Examine", () => GD.Print(examinable.GetExamineText()));
+		}
+
+		OpenContextMenu(mousePos);
 	}
 
-	private void OnLootMenuIndexPressed(long index)
+	private void LootSpecificItem(ILootable lootable, string itemName)
 	{
-		if (_activeLoot == null) return;
-
-		string itemName = _lootMenuItemNames[(int)index];
-
 		int count = 0;
-		foreach (string item in _activeLoot.Items)
+		foreach (string item in lootable.Items)
 		{
 			if (item == itemName) count++;
 		}
@@ -523,7 +535,6 @@ public partial class Player : CharacterBody3D
 
 		if (!added)
 		{
-			_activeLoot = null;
 			return;
 		}
 
@@ -531,9 +542,95 @@ public partial class Player : CharacterBody3D
 
 		for (int i = 0; i < count; i++)
 		{
-			_activeLoot.RemoveItem(itemName);
+			lootable.RemoveItem(itemName);
+		}
+	}
+
+	private void OpenChestClosedContextMenu(Chest chest, Vector2 mousePos, Vector3 hitPosition)
+	{
+		_contextMenu.Clear();
+		_contextMenuActions.Clear();
+
+		AddContextMenuOption("Open", () => TryOpenChestWithInventoryKey(chest, hitPosition));
+		AddContextMenuOption("Examine", () => GD.Print(chest.GetExamineText()));
+
+		OpenContextMenu(mousePos);
+	}
+
+	// Walks to the chest and, if the player already has the matching key
+	// somewhere in their inventory, opens it automatically (consuming the
+	// key) -- same end result as manually selecting the key and clicking
+	// the chest, just triggered from the "Open" menu option instead.
+	private void TryOpenChestWithInventoryKey(Chest chest, Vector3 hitPosition)
+	{
+		SpawnClickIndicator(hitPosition, InteractIndicatorColor);
+
+		var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
+		int keySlot = inventory.FindSlotIndex(chest.RequiredKeyName);
+
+		if (keySlot < 0)
+		{
+			GD.Print("I could loot this chest with the right key!");
+			return;
 		}
 
-		_activeLoot = null;
+		Vector3 targetPos = chest.GlobalPosition;
+		_moveTarget = targetPos;
+		_pendingActionPosition = targetPos;
+		_pendingActionRange = InteractRange;
+		_pendingAction = () =>
+		{
+			if (!IsInstanceValid(chest) || chest.IsOpen) return;
+
+			int currentKeySlot = inventory.FindSlotIndex(chest.RequiredKeyName);
+			if (currentKeySlot < 0)
+			{
+				GD.Print("I could loot this chest with the right key!");
+				return;
+			}
+
+			chest.Open();
+			inventory.RemoveItemAt(currentKeySlot);
+			GD.Print("The chest opened and magically consumed the key!");
+		};
+		ResetStuckCheck();
+	}
+	// Open chest, right-clicked: item rows (if any) via the shared loot
+	// menu helper, always with "Examine" appended -- covers both the
+	// "still has loot" and "picked clean" cases in one place.
+	private void OpenChestOpenContextMenu(Chest chest, Vector2 mousePos)
+	{
+		if (chest.Items.Count > 0)
+		{
+			OpenLootContextMenu(chest, mousePos);
+			return;
+		}
+
+		_contextMenu.Clear();
+		_contextMenuActions.Clear();
+		AddContextMenuOption("Examine", () => GD.Print(chest.GetExamineText()));
+		OpenContextMenu(mousePos);
+	}
+
+	private void OpenKeyPickupContextMenu(KeyPickup keyPickup, Vector2 mousePos)
+	{
+		_contextMenu.Clear();
+		_contextMenuActions.Clear();
+
+		AddContextMenuOption("Take", () => WalkToAndPickUpKey(keyPickup));
+		AddContextMenuOption("Examine", () => GD.Print(keyPickup.GetExamineText()));
+
+		OpenContextMenu(mousePos);
+	}
+
+	private void OpenNpcContextMenu(Npc npc, Vector2 mousePos)
+	{
+		_contextMenu.Clear();
+		_contextMenuActions.Clear();
+
+		AddContextMenuOption("Attack", () => StartAttacking(npc));
+		AddContextMenuOption("Examine", () => GD.Print(npc.GetExamineText()));
+
+		OpenContextMenu(mousePos);
 	}
 }

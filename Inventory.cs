@@ -22,6 +22,22 @@ public partial class Inventory : Node
 		if (index < 0 || index >= _quantities.Length) return 0;
 		return _quantities[index];
 	}
+
+	// Returns the index of the first slot containing this item, or -1 if
+	// none found. Used e.g. by the chest "Open" context menu option to
+	// auto-locate a matching key without the player manually selecting it.
+	public int FindSlotIndex(string itemName)
+	{
+		for (int i = 0; i < SlotCount; i++)
+		{
+			if (_slots[i] == itemName)
+			{
+				return i;
+			}
+		}
+		return -1;
+	}
+
 	// Removes one unit from a SPECIFIC slot, regardless of what other
 	// slots might contain the same item name. Used when the player has
 	// selected a particular slot in the UI (e.g. one of two "Key" slots).
@@ -46,9 +62,6 @@ public partial class Inventory : Node
 
 	public bool AddItem(string itemName, int quantity = 1)
 	{
-		// If this item type stacks, look for an existing stack of it first.
-		// This is allowed even when the inventory is otherwise full, since
-		// it doesn't need a new slot.
 		if (ItemDatabase.IsStackable(itemName))
 		{
 			for (int i = 0; i < SlotCount; i++)
@@ -63,7 +76,6 @@ public partial class Inventory : Node
 			}
 		}
 
-		// No existing stack (or not stackable) — find a fresh empty slot.
 		for (int i = 0; i < SlotCount; i++)
 		{
 			if (_slots[i] == null)
@@ -92,8 +104,6 @@ public partial class Inventory : Node
 		return false;
 	}
 
-	// Removes ONE unit of the item. For stackable items, this decrements the
-	// stack; the slot only clears once quantity reaches 0.
 	public bool RemoveItem(string itemName)
 	{
 		for (int i = 0; i < SlotCount; i++)
