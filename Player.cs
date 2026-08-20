@@ -19,20 +19,16 @@ public partial class Player : CharacterBody3D
 	[Export] public float MinPitch = -60f;
 	[Export] public float MaxPitch = -5f;
 
-	// Assign the click_indicator.tscn scene here in the Inspector.
 	[Export] public PackedScene ClickIndicatorScene;
 
-	// TODO: once weapons exist, replace this flat value with a per-weapon
-	// attack speed lookup instead of a fixed export field.
 	[Export] public double AttackIntervalSeconds = 1.2;
 
-	private static readonly Color WalkIndicatorColor = new Color(1f, 0.85f, 0f);   // yellow
-	private static readonly Color InteractIndicatorColor = new Color(0.85f, 0.1f, 0.1f); // red
+	private static readonly Color WalkIndicatorColor = new Color(1f, 0.85f, 0f);
+	private static readonly Color InteractIndicatorColor = new Color(0.85f, 0.1f, 0.1f);
 
 	private float _cameraYaw = 0f;
 	private float _cameraPitch = -20f;
 
-	// --- Click-to-move state ---
 	private Vector3? _moveTarget = null;
 	private const float ArrivalDistance = 0.2f;
 
@@ -385,33 +381,43 @@ public partial class Player : CharacterBody3D
 		ResetStuckCheck();
 	}
 
-	// Grabs ALL matching entries of a stacked item in one click (e.g. all 3
-	// "Coins" entries at once), or just the single entry for non-stackable items.
+	// Grabs ALL matching entries for a STACKABLE item in one click (e.g.
+	// all 3 "Coins" entries at once, merged into one inventory stack). For
+	// a NON-stackable item, only grabs the single top instance -- clicking
+	// a pile with 2 Bones picks up just 1 Bone per click, each landing in
+	// its own inventory slot, matching how non-stackable items never merge.
 	private void GrabItem(ILootable lootable, string itemName)
 	{
-		int count = 0;
-		foreach (string item in lootable.Items)
-		{
-			if (item == itemName) count++;
-		}
-
 		var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
-		bool added = inventory.AddItem(itemName, count);
 
-		if (!added)
+		if (ItemDatabase.IsStackable(itemName))
 		{
-			return;
+			int count = 0;
+			foreach (string item in lootable.Items)
+			{
+				if (item == itemName) count++;
+			}
+
+			bool added = inventory.AddItem(itemName, count);
+			if (!added) return;
+
+			GD.Print("Looted: " + ItemDatabase.GetDisplayText(itemName, count));
+
+			for (int i = 0; i < count; i++)
+			{
+				lootable.RemoveItem(itemName);
+			}
 		}
-
-		GD.Print("Looted: " + ItemDatabase.GetDisplayText(itemName, count));
-
-		for (int i = 0; i < count; i++)
+		else
 		{
+			bool added = inventory.AddItem(itemName, 1);
+			if (!added) return;
+
+			GD.Print("Looted: " + ItemDatabase.GetSingleInstanceName(itemName));
 			lootable.RemoveItem(itemName);
 		}
 	}
 
-	// Any item name starting with "Key" counts as a key-type item.
 	private bool IsKeyItem(string itemName)
 	{
 		return itemName != null && itemName.StartsWith("Key");
@@ -465,10 +471,6 @@ public partial class Player : CharacterBody3D
 	}
 
 	// --- Generic right-click context menu helpers ---
-	// Any world object builds a menu out of these two calls: add whatever
-	// options make sense, then open it. Each option carries its own Action,
-	// so the menu system doesn't need to know what a Chest or an Npc even
-	// is -- makes it easy to hook up doors, NPCs with dialogue, etc. later.
 
 	private void AddContextMenuOption(string label, Action action)
 	{
@@ -490,28 +492,39 @@ public partial class Player : CharacterBody3D
 		action?.Invoke();
 	}
 
-	// Groups duplicate entries (e.g. three "Coins") into a single menu row
-	// with a combined display like "3 Gold Coins". Adds an "Examine" option
-	// automatically if the lootable also implements IExaminable.
+	// STACKABLE items (Coins) get ONE row per name, combined into a count
+	// ("3 Gold Coins"). NON-stackable items (Bones, etc.) get ONE row PER
+	// INSTANCE -- two Bones from two separate kills show as two distinct
+	// "Bone" rows, not merged into a single counted line. Adds "Examine"
+	// last if the lootable implements IExaminable.
 	private void OpenLootContextMenu(ILootable lootable, Vector2 mousePos)
 	{
 		_contextMenu.Clear();
 		_contextMenuActions.Clear();
 
-		var seen = new HashSet<string>();
+		var seenStackable = new HashSet<string>();
+
 		foreach (string item in lootable.Items)
 		{
-			if (seen.Contains(item)) continue;
-			seen.Add(item);
-
-			int count = 0;
-			foreach (string i in lootable.Items)
+			if (ItemDatabase.IsStackable(item))
 			{
-				if (i == item) count++;
-			}
+				if (seenStackable.Contains(item)) continue;
+				seenStackable.Add(item);
 
-			string itemName = item;
-			AddContextMenuOption(ItemDatabase.GetDisplayText(item, count), () => LootSpecificItem(lootable, itemName));
+				int count = 0;
+				foreach (string i in lootable.Items)
+				{
+					if (i == item) count++;
+				}
+
+				string itemName = item;
+				AddContextMenuOption(ItemDatabase.GetDisplayText(item, count), () => LootStackableItem(lootable, itemName));
+			}
+			else
+			{
+				string itemName = item;
+				AddContextMenuOption(ItemDatabase.GetSingleInstanceName(item), () => LootSingleItem(lootable, itemName));
+			}
 		}
 
 		if (lootable is IExaminable examinable)
@@ -522,7 +535,8 @@ public partial class Player : CharacterBody3D
 		OpenContextMenu(mousePos);
 	}
 
-	private void LootSpecificItem(ILootable lootable, string itemName)
+	// Loots every remaining instance of a stackable item in one action.
+	private void LootStackableItem(ILootable lootable, string itemName)
 	{
 		int count = 0;
 		foreach (string item in lootable.Items)
@@ -532,11 +546,7 @@ public partial class Player : CharacterBody3D
 
 		var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
 		bool added = inventory.AddItem(itemName, count);
-
-		if (!added)
-		{
-			return;
-		}
+		if (!added) return;
 
 		GD.Print("Looted: " + ItemDatabase.GetDisplayText(itemName, count));
 
@@ -544,6 +554,18 @@ public partial class Player : CharacterBody3D
 		{
 			lootable.RemoveItem(itemName);
 		}
+	}
+
+	// Loots exactly ONE instance of a non-stackable item -- used when the
+	// player clicks one specific "Bone" row out of possibly several.
+	private void LootSingleItem(ILootable lootable, string itemName)
+	{
+		var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
+		bool added = inventory.AddItem(itemName, 1);
+		if (!added) return;
+
+		GD.Print("Looted: " + ItemDatabase.GetSingleInstanceName(itemName));
+		lootable.RemoveItem(itemName);
 	}
 
 	private void OpenChestClosedContextMenu(Chest chest, Vector2 mousePos, Vector3 hitPosition)
@@ -557,10 +579,20 @@ public partial class Player : CharacterBody3D
 		OpenContextMenu(mousePos);
 	}
 
-	// Walks to the chest and, if the player already has the matching key
-	// somewhere in their inventory, opens it automatically (consuming the
-	// key) -- same end result as manually selecting the key and clicking
-	// the chest, just triggered from the "Open" menu option instead.
+	private void OpenChestOpenContextMenu(Chest chest, Vector2 mousePos)
+	{
+		if (chest.Items.Count > 0)
+		{
+			OpenLootContextMenu(chest, mousePos);
+			return;
+		}
+
+		_contextMenu.Clear();
+		_contextMenuActions.Clear();
+		AddContextMenuOption("Examine", () => GD.Print(chest.GetExamineText()));
+		OpenContextMenu(mousePos);
+	}
+
 	private void TryOpenChestWithInventoryKey(Chest chest, Vector3 hitPosition)
 	{
 		SpawnClickIndicator(hitPosition, InteractIndicatorColor);
@@ -594,22 +626,6 @@ public partial class Player : CharacterBody3D
 			GD.Print("The chest opened and magically consumed the key!");
 		};
 		ResetStuckCheck();
-	}
-	// Open chest, right-clicked: item rows (if any) via the shared loot
-	// menu helper, always with "Examine" appended -- covers both the
-	// "still has loot" and "picked clean" cases in one place.
-	private void OpenChestOpenContextMenu(Chest chest, Vector2 mousePos)
-	{
-		if (chest.Items.Count > 0)
-		{
-			OpenLootContextMenu(chest, mousePos);
-			return;
-		}
-
-		_contextMenu.Clear();
-		_contextMenuActions.Clear();
-		AddContextMenuOption("Examine", () => GD.Print(chest.GetExamineText()));
-		OpenContextMenu(mousePos);
 	}
 
 	private void OpenKeyPickupContextMenu(KeyPickup keyPickup, Vector2 mousePos)
