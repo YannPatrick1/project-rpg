@@ -4,7 +4,7 @@ public partial class KeyPickup : Area3D, IExaminable
 {
 	public void PickUp()
 	{
-		var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
+		var inventory = PartyManager.Instance.GetActiveInventory();
 		bool added = inventory.AddItem("Key");
 
 		if (!added)

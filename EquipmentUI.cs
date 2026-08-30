@@ -2,9 +2,6 @@ using Godot;
 using System.Collections.Generic;
 using System.Linq;
 
-// Attach to the "EquipmentPanel" Control (a sibling of the inventory
-// GridContainer, inside InventoryUI's root). Finds every EquipmentSlotUI
-// child automatically, wherever it's placed in the grid layout.
 public partial class EquipmentUI : Control
 {
 	private List<EquipmentSlotUI> _slots;
@@ -14,11 +11,8 @@ public partial class EquipmentUI : Control
 
 	public override void _Ready()
 	{
-		_equipment = GetNode<Equipment>("/root/World/PlayerEquipment");
 		_database = GetNode<EquipmentDatabase>("/root/World/EquipmentDatabase");
 		_inventoryUI = GetNode<InventoryUI>("/root/World/InventoryUI");
-
-		_equipment.EquipmentChanged += RefreshDisplay;
 
 		_slots = FindSlotChildren(this);
 		foreach (var slot in _slots)
@@ -26,6 +20,22 @@ public partial class EquipmentUI : Control
 			slot.SlotClicked += OnSlotClicked;
 		}
 
+		PartyManager.Instance.ActiveCharacterChanged += OnActiveCharacterChanged;
+		if (PartyManager.Instance.GetActiveEquipment() != null)
+		{
+			OnActiveCharacterChanged();
+		}
+	}
+
+	private void OnActiveCharacterChanged()
+	{
+		if (_equipment != null)
+		{
+			_equipment.EquipmentChanged -= RefreshDisplay;
+		}
+
+		_equipment = PartyManager.Instance.GetActiveEquipment();
+		_equipment.EquipmentChanged += RefreshDisplay;
 		RefreshDisplay();
 	}
 
@@ -57,8 +67,6 @@ public partial class EquipmentUI : Control
 			return;
 		}
 
-		// Nothing selected in the inventory -- clicking an occupied
-		// equipment slot unequips it instead.
 		_equipment.Unequip(slot);
 	}
 

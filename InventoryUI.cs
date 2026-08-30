@@ -20,10 +20,7 @@ public partial class InventoryUI : Control
 	public override void _Ready()
 	{
 		_grid = GetNode<GridContainer>("GridContainer");
-		_inventory = GetNode<Inventory>("/root/World/PlayerInventory");
-		_inventory.InventoryChanged += RefreshDisplay;
 
-		_equipment = GetNode<Equipment>("/root/World/PlayerEquipment");
 		_equipmentDatabase = GetNode<EquipmentDatabase>("/root/World/EquipmentDatabase");
 
 		_itemContextMenu = GetNode<PopupMenu>("/root/World/ItemContextMenu");
@@ -43,8 +40,32 @@ public partial class InventoryUI : Control
 			slot.SlotRightClicked += OnSlotRightClicked;
 		}
 
-		RefreshDisplay();
+		// Point this UI at whichever character is active. If the
+		// character already registered by the time we get here, hook up
+		// immediately; otherwise wait for the signal. This handles both
+		// possible _Ready orderings between InventoryUI and Player, and
+		// is also what will make character-switching "just work" later.
+		PartyManager.Instance.ActiveCharacterChanged += OnActiveCharacterChanged;
+		if (PartyManager.Instance.GetActiveInventory() != null)
+		{
+			OnActiveCharacterChanged();
+		}
+
 		ShowInventoryTab();
+	}
+
+	private void OnActiveCharacterChanged()
+	{
+		if (_inventory != null)
+		{
+			_inventory.InventoryChanged -= RefreshDisplay;
+		}
+
+		_inventory = PartyManager.Instance.GetActiveInventory();
+		_equipment = PartyManager.Instance.GetActiveEquipment();
+
+		_inventory.InventoryChanged += RefreshDisplay;
+		RefreshDisplay();
 	}
 
 	private void ShowInventoryTab()
@@ -91,10 +112,6 @@ public partial class InventoryUI : Control
 		string item = _inventory.GetItemAt(index);
 		if (string.IsNullOrEmpty(item)) return;
 
-		// Left-clicking an equippable item attempts to equip it right away
-		// (OSRS convention: left-click = default action). Non-equippable
-		// items fall back to the old "select for use on target" flow
-		// (e.g. selecting a key to use on a chest).
 		var equipData = _equipmentDatabase.GetData(item);
 		if (equipData != null)
 		{

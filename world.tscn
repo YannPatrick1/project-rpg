@@ -42,8 +42,14 @@ environment = SubResource("Environment_rlqx7")
 [node name="Player" parent="." unique_id=1712078198 instance=ExtResource("1_f3sb7")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
 
-[node name="PlayerInventory" type="Node" parent="." unique_id=1105043992]
+[node name="PlayerInventory" type="Node" parent="Player" unique_id=1105043992]
 script = ExtResource("2_fj7yv")
+
+[node name="PlayerStats" type="Node" parent="Player" unique_id=987608886]
+script = ExtResource("6_gbfbk")
+
+[node name="PlayerEquipment" type="Node" parent="Player" unique_id=1865042074]
+script = ExtResource("7_wse8f")
 
 [node name="NPC" parent="." unique_id=1617591341 instance=ExtResource("3_tlwt5")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 3)
@@ -54,12 +60,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 3)
 
 [node name="Chest" parent="." unique_id=373795362 instance=ExtResource("5_036b0")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1, -4)
-
-[node name="PlayerStats" type="Node" parent="." unique_id=987608886]
-script = ExtResource("6_gbfbk")
-
-[node name="PlayerEquipment" type="Node" parent="." unique_id=1865042074]
-script = ExtResource("7_wse8f")
 
 [node name="EquipmentDatabase" type="Node" parent="." unique_id=1704149469]
 script = ExtResource("8_wse8f")

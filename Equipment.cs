@@ -1,8 +1,14 @@
 using Godot;
 using System.Collections.Generic;
 
-// Attach to a node under World (e.g. "PlayerEquipment"). Tracks what's
-// currently equipped in each slot and keeps PlayerStats in sync.
+// Attach as a child of a character node (e.g. "Player"), alongside
+// sibling "PlayerInventory" and "PlayerStats" nodes. Tracks what's
+// currently equipped in each slot and keeps that character's
+// PlayerStats in sync.
+//
+// EquipmentDatabase is the one exception still fetched by absolute
+// path -- it's shared item data, not per-character state, so every
+// character reads from the same one.
 public partial class Equipment : Node
 {
 	[Signal] public delegate void EquipmentChangedEventHandler();
@@ -15,9 +21,9 @@ public partial class Equipment : Node
 
 	public override void _Ready()
 	{
-		_inventory = GetNode<Inventory>("/root/World/PlayerInventory");
+		_inventory = GetParent().GetNode<Inventory>("PlayerInventory");
+		_stats = GetParent().GetNode<PlayerStats>("PlayerStats");
 		_database = GetNode<EquipmentDatabase>("/root/World/EquipmentDatabase");
-		_stats = GetNode<PlayerStats>("/root/World/PlayerStats");
 	}
 
 	public string GetEquipped(EquipSlot slot)
@@ -25,10 +31,6 @@ public partial class Equipment : Node
 		return _equipped.GetValueOrDefault(slot);
 	}
 
-	// Equips the item sitting in the given inventory slot index, as long
-	// as its EquipmentData says it belongs in targetSlot. If something's
-	// already equipped there, it gets swapped back into the inventory
-	// first (and the equip is refused if there's no room for it).
 	public bool EquipFromInventory(int inventoryIndex, EquipSlot targetSlot)
 	{
 		string itemName = _inventory.GetItemAt(inventoryIndex);
@@ -67,8 +69,6 @@ public partial class Equipment : Node
 		return true;
 	}
 
-	// Unequips whatever's in the given slot back into the inventory, if
-	// there's room. Returns true if the slot ended up empty.
 	public bool Unequip(EquipSlot slot)
 	{
 		string itemName = GetEquipped(slot);

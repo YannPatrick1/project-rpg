@@ -9,6 +9,10 @@ public partial class Player : CharacterBody3D
 	private List<Action> _contextMenuActions = new();
 	private InventoryUI _inventoryUI;
 
+	private Inventory _inventory;
+	private Equipment _equipment;
+	private PlayerStats _stats;
+
 	public const float Speed = 5.0f;
 	private const float InteractRange = 3.0f;
 
@@ -50,6 +54,16 @@ public partial class Player : CharacterBody3D
 		_contextMenu = GetNode<PopupMenu>("/root/World/LootMenu");
 		_contextMenu.IndexPressed += OnContextMenuIndexPressed;
 		_inventoryUI = GetNode<InventoryUI>("/root/World/InventoryUI");
+
+		// This character's own nodes, now nested under Player instead of
+		// World. Registering with PartyManager is what lets UI and world
+		// objects (KeyPickup, etc.) reach "whichever character is active"
+		// without hardcoding a path to this specific Player node.
+		_inventory = GetNode<Inventory>("PlayerInventory");
+		_equipment = GetNode<Equipment>("PlayerEquipment");
+		_stats = GetNode<PlayerStats>("PlayerStats");
+
+		PartyManager.Instance.RegisterActiveCharacter(this, _inventory, _equipment, _stats);
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -388,8 +402,6 @@ public partial class Player : CharacterBody3D
 	// its own inventory slot, matching how non-stackable items never merge.
 	private void GrabItem(ILootable lootable, string itemName)
 	{
-		var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
-
 		if (ItemDatabase.IsStackable(itemName))
 		{
 			int count = 0;
@@ -398,7 +410,7 @@ public partial class Player : CharacterBody3D
 				if (item == itemName) count++;
 			}
 
-			bool added = inventory.AddItem(itemName, count);
+			bool added = _inventory.AddItem(itemName, count);
 			if (!added) return;
 
 			GD.Print("Looted: " + ItemDatabase.GetDisplayText(itemName, count));
@@ -410,7 +422,7 @@ public partial class Player : CharacterBody3D
 		}
 		else
 		{
-			bool added = inventory.AddItem(itemName, 1);
+			bool added = _inventory.AddItem(itemName, 1);
 			if (!added) return;
 
 			GD.Print("Looted: " + ItemDatabase.GetSingleInstanceName(itemName));
@@ -449,8 +461,7 @@ public partial class Player : CharacterBody3D
 				if (chest.RequiredKeyName == itemName)
 				{
 					chest.Open();
-					var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
-					inventory.RemoveItemAt(itemIndex);
+					_inventory.RemoveItemAt(itemIndex);
 					GD.Print("The chest opened and magically consumed the key!");
 				}
 				else if (IsKeyItem(itemName))
@@ -544,8 +555,7 @@ public partial class Player : CharacterBody3D
 			if (item == itemName) count++;
 		}
 
-		var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
-		bool added = inventory.AddItem(itemName, count);
+		bool added = _inventory.AddItem(itemName, count);
 		if (!added) return;
 
 		GD.Print("Looted: " + ItemDatabase.GetDisplayText(itemName, count));
@@ -560,8 +570,7 @@ public partial class Player : CharacterBody3D
 	// player clicks one specific "Bone" row out of possibly several.
 	private void LootSingleItem(ILootable lootable, string itemName)
 	{
-		var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
-		bool added = inventory.AddItem(itemName, 1);
+		bool added = _inventory.AddItem(itemName, 1);
 		if (!added) return;
 
 		GD.Print("Looted: " + ItemDatabase.GetSingleInstanceName(itemName));
@@ -597,8 +606,7 @@ public partial class Player : CharacterBody3D
 	{
 		SpawnClickIndicator(hitPosition, InteractIndicatorColor);
 
-		var inventory = GetNode<Inventory>("/root/World/PlayerInventory");
-		int keySlot = inventory.FindSlotIndex(chest.RequiredKeyName);
+		int keySlot = _inventory.FindSlotIndex(chest.RequiredKeyName);
 
 		if (keySlot < 0)
 		{
@@ -614,7 +622,7 @@ public partial class Player : CharacterBody3D
 		{
 			if (!IsInstanceValid(chest) || chest.IsOpen) return;
 
-			int currentKeySlot = inventory.FindSlotIndex(chest.RequiredKeyName);
+			int currentKeySlot = _inventory.FindSlotIndex(chest.RequiredKeyName);
 			if (currentKeySlot < 0)
 			{
 				GD.Print("I could loot this chest with the right key!");
@@ -622,7 +630,7 @@ public partial class Player : CharacterBody3D
 			}
 
 			chest.Open();
-			inventory.RemoveItemAt(currentKeySlot);
+			_inventory.RemoveItemAt(currentKeySlot);
 			GD.Print("The chest opened and magically consumed the key!");
 		};
 		ResetStuckCheck();
