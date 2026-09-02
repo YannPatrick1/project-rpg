@@ -4,7 +4,14 @@ using System.Collections.Generic;
 
 public partial class Player : CharacterBody3D
 {
+	// Which of the 3 party slots this instance is. Set this to 0, 1, or 2
+	// in the Inspector for each of the three Player instances in the
+	// world scene -- exactly one should be 0, one should be 1, one
+	// should be 2. The character with PartyIndex 0 starts in control.
+	[Export] public int PartyIndex = 0;
+
 	private SpringArm3D _springArm;
+	private Camera3D _camera;
 	private PopupMenu _contextMenu;
 	private List<Action> _contextMenuActions = new();
 	private InventoryUI _inventoryUI;
@@ -48,22 +55,41 @@ public partial class Player : CharacterBody3D
 	private Npc _attackTarget = null;
 	private double _attackCooldown = 0;
 
+	// True if this instance is the party member currently under player
+	// control. Everything below -- camera, mouse input, click-to-move --
+	// checks this before acting.
+	public bool IsActiveCharacter =>
+		PartyManager.Instance != null && PartyManager.Instance.IsActiveIndex(PartyIndex);
+
 	public override void _Ready()
 	{
 		_springArm = GetNode<SpringArm3D>("SpringArm3D");
+		_camera = _springArm.GetNode<Camera3D>("Camera3D");
 		_contextMenu = GetNode<PopupMenu>("/root/World/LootMenu");
 		_contextMenu.IndexPressed += OnContextMenuIndexPressed;
 		_inventoryUI = GetNode<InventoryUI>("/root/World/InventoryUI");
 
-		// This character's own nodes, now nested under Player instead of
-		// World. Registering with PartyManager is what lets UI and world
-		// objects (KeyPickup, etc.) reach "whichever character is active"
-		// without hardcoding a path to this specific Player node.
 		_inventory = GetNode<Inventory>("PlayerInventory");
 		_equipment = GetNode<Equipment>("PlayerEquipment");
 		_stats = GetNode<PlayerStats>("PlayerStats");
 
-		PartyManager.Instance.RegisterActiveCharacter(this, _inventory, _equipment, _stats);
+		PartyManager.Instance.RegisterPartyMember(PartyIndex, this, _inventory, _equipment, _stats);
+		PartyManager.Instance.ActiveCharacterChanged += OnActiveCharacterChanged;
+
+		UpdateCameraState();
+	}
+
+	private void OnActiveCharacterChanged()
+	{
+		UpdateCameraState();
+	}
+
+	// Only the active character's camera should be Current -- Godot
+	// only ever renders through one Camera3D at a time, so switching
+	// control means switching which character's camera is live.
+	private void UpdateCameraState()
+	{
+		_camera.Current = IsActiveCharacter;
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -73,6 +99,18 @@ public partial class Player : CharacterBody3D
 		if (!IsOnFloor())
 		{
 			velocity += GetGravity() * (float)delta;
+		}
+
+		if (!IsActiveCharacter)
+		{
+			// Inactive party members just hold their ground for now --
+			// no follow-AI yet, that's a future pass. Gravity above still
+			// applies so they don't float if standing on uneven terrain.
+			velocity.X = 0;
+			velocity.Z = 0;
+			Velocity = velocity;
+			MoveAndSlide();
+			return;
 		}
 
 		ProcessCombat(delta);
@@ -217,6 +255,8 @@ public partial class Player : CharacterBody3D
 
 	public override void _UnhandledInput(InputEvent @event)
 	{
+		if (!IsActiveCharacter) return;
+
 		if (@event is InputEventMouseMotion mouseMotion && Input.IsMouseButtonPressed(MouseButton.Middle))
 		{
 			_cameraYaw -= mouseMotion.Relative.X * MouseSensitivity;
@@ -395,11 +435,6 @@ public partial class Player : CharacterBody3D
 		ResetStuckCheck();
 	}
 
-	// Grabs ALL matching entries for a STACKABLE item in one click (e.g.
-	// all 3 "Coins" entries at once, merged into one inventory stack). For
-	// a NON-stackable item, only grabs the single top instance -- clicking
-	// a pile with 2 Bones picks up just 1 Bone per click, each landing in
-	// its own inventory slot, matching how non-stackable items never merge.
 	private void GrabItem(ILootable lootable, string itemName)
 	{
 		if (ItemDatabase.IsStackable(itemName))
@@ -503,11 +538,6 @@ public partial class Player : CharacterBody3D
 		action?.Invoke();
 	}
 
-	// STACKABLE items (Coins) get ONE row per name, combined into a count
-	// ("3 Gold Coins"). NON-stackable items (Bones, etc.) get ONE row PER
-	// INSTANCE -- two Bones from two separate kills show as two distinct
-	// "Bone" rows, not merged into a single counted line. Adds "Examine"
-	// last if the lootable implements IExaminable.
 	private void OpenLootContextMenu(ILootable lootable, Vector2 mousePos)
 	{
 		_contextMenu.Clear();
@@ -546,7 +576,6 @@ public partial class Player : CharacterBody3D
 		OpenContextMenu(mousePos);
 	}
 
-	// Loots every remaining instance of a stackable item in one action.
 	private void LootStackableItem(ILootable lootable, string itemName)
 	{
 		int count = 0;
@@ -566,8 +595,6 @@ public partial class Player : CharacterBody3D
 		}
 	}
 
-	// Loots exactly ONE instance of a non-stackable item -- used when the
-	// player clicks one specific "Bone" row out of possibly several.
 	private void LootSingleItem(ILootable lootable, string itemName)
 	{
 		bool added = _inventory.AddItem(itemName, 1);

@@ -51,6 +51,32 @@ script = ExtResource("6_gbfbk")
 [node name="PlayerEquipment" type="Node" parent="Player" unique_id=1865042074]
 script = ExtResource("7_wse8f")
 
+[node name="Player2" parent="." unique_id=2033030938 instance=ExtResource("1_f3sb7")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 2, 1)
+PartyIndex = 1
+
+[node name="PlayerInventory" type="Node" parent="Player2" unique_id=1852385]
+script = ExtResource("2_fj7yv")
+
+[node name="PlayerStats" type="Node" parent="Player2" unique_id=1828311661]
+script = ExtResource("6_gbfbk")
+
+[node name="PlayerEquipment" type="Node" parent="Player2" unique_id=152289058]
+script = ExtResource("7_wse8f")
+
+[node name="Player3" parent="." unique_id=814811573 instance=ExtResource("1_f3sb7")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 2, 1)
+PartyIndex = 2
+
+[node name="PlayerInventory" type="Node" parent="Player3" unique_id=15333005]
+script = ExtResource("2_fj7yv")
+
+[node name="PlayerStats" type="Node" parent="Player3" unique_id=450110471]
+script = ExtResource("6_gbfbk")
+
+[node name="PlayerEquipment" type="Node" parent="Player3" unique_id=62605965]
+script = ExtResource("7_wse8f")
+
 [node name="NPC" parent="." unique_id=1617591341 instance=ExtResource("3_tlwt5")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 3)
 
