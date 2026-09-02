@@ -4,8 +4,8 @@ using System.Collections.Generic;
 public partial class EquipmentSlotUI : Panel
 {
 	[Signal] public delegate void SlotClickedEventHandler(int slotIndex);
+	[Signal] public delegate void SlotRightClickedEventHandler(int slotIndex);
 
-	// Set this per-instance in the Inspector (Head/Body/Legs/Feet/LeftHand/RightHand).
 	[Export] public EquipSlot Slot;
 
 	private Label _label;
@@ -60,9 +60,16 @@ public partial class EquipmentSlotUI : Panel
 
 	public override void _GuiInput(InputEvent @event)
 	{
-		if (@event is InputEventMouseButton mouseButton && mouseButton.Pressed && mouseButton.ButtonIndex == MouseButton.Left)
+		if (@event is InputEventMouseButton mouseButton && mouseButton.Pressed)
 		{
-			EmitSignal(SignalName.SlotClicked, (int)Slot);
+			if (mouseButton.ButtonIndex == MouseButton.Left)
+			{
+				EmitSignal(SignalName.SlotClicked, (int)Slot);
+			}
+			else if (mouseButton.ButtonIndex == MouseButton.Right)
+			{
+				EmitSignal(SignalName.SlotRightClicked, (int)Slot);
+			}
 		}
 	}
 }

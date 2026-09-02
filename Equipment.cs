@@ -1,14 +1,6 @@
 using Godot;
 using System.Collections.Generic;
 
-// Attach as a child of a character node (e.g. "Player"), alongside
-// sibling "PlayerInventory" and "PlayerStats" nodes. Tracks what's
-// currently equipped in each slot and keeps that character's
-// PlayerStats in sync.
-//
-// EquipmentDatabase is the one exception still fetched by absolute
-// path -- it's shared item data, not per-character state, so every
-// character reads from the same one.
 public partial class Equipment : Node
 {
 	[Signal] public delegate void EquipmentChangedEventHandler();
@@ -85,6 +77,35 @@ public partial class Equipment : Node
 		RecalculateStats();
 		EmitSignal(SignalName.EquipmentChanged);
 		return true;
+	}
+
+	// Triggers whatever's equipped in this slot, if it's usable. This is
+	// the "Ring of Recall" entry point -- called from EquipmentUI when
+	// the player right-clicks an equipped slot and picks "Use".
+	public void UseEquipped(EquipSlot slot)
+	{
+		string itemName = GetEquipped(slot);
+		if (string.IsNullOrEmpty(itemName)) return;
+
+		var data = _database.GetData(itemName);
+		if (data == null || !data.IsUsable)
+		{
+			GD.Print("Nothing happens.");
+			return;
+		}
+
+		switch (data.AbilityId)
+		{
+			case "recall_party":
+				if (PartyManager.Instance != null && GetParent() is Node3D caster)
+				{
+					PartyManager.Instance.RecallPartyTo(caster);
+				}
+				break;
+			default:
+				GD.Print("Nothing happens.");
+				break;
+		}
 	}
 
 	private void RecalculateStats()

@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="EquipmentData" format=3 uid="uid://c8uw2nc0x8r8f"]
+
+[ext_resource type="Script" uid="uid://bu2ng2he8w8xd" path="res://EquipmentData.cs" id="1_pfs5b"]
+
+[resource]
+script = ExtResource("1_pfs5b")
+ItemName = "Ring of Recall"
+Slot = 4
+IsUsable = true
+AbilityId = "recall_party"
+metadata/_custom_type_script = "uid://bu2ng2he8w8xd"

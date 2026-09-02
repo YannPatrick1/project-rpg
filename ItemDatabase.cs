@@ -10,9 +10,9 @@ public static class ItemDatabase
 		{ "Gold", false },
 		{ "Gem", false },
 		{ "Dull Sword", false },
+		{ "Ring of Recall", false },
 	};
 
-	// Used for stackable items' combined display, e.g. "1 Gold Coin" / "3 Gold Coins".
 	private static readonly Dictionary<string, string> _singularName = new()
 	{
 		{ "Coins", "Gold Coin" },
@@ -23,16 +23,11 @@ public static class ItemDatabase
 		{ "Coins", "Gold Coins" },
 	};
 
-	// Used for NON-stackable items' per-instance display, e.g. one "Bones"
-	// entry in the pile should read as "Bone" in the loot menu.
 	private static readonly Dictionary<string, string> _singleInstanceName = new()
 	{
 		{ "Bones", "Bone" },
 	};
 
-	// Flavor text shown when the player right-clicks an item and chooses
-	// "Examine". New items only need an entry here to get examine support —
-	// no other code changes needed. Falls back to a generic line if missing.
 	private static readonly Dictionary<string, string> _examineText = new()
 	{
 		{ "Coins", "Gold coins, jingling with the promise of better gear (eventually)." },
@@ -41,6 +36,7 @@ public static class ItemDatabase
 		{ "Gold", "A lump of raw gold. Shiny, heavy, and not currently doing much." },
 		{ "Gem", "A gem that catches the light nicely. Valuable, or just very convincing glass." },
 		{ "Dull Sword", "A sword so dull it might bruise before it cuts. Still technically a weapon." },
+		{ "Ring of Recall", "A plain silver band, faintly warm to the touch. It always seems to know where the rest of the party is." },
 	};
 
 	public static bool IsStackable(string itemName)
@@ -48,8 +44,6 @@ public static class ItemDatabase
 		return _stackable.TryGetValue(itemName, out bool stackable) && stackable;
 	}
 
-	// Full display text for a stackable item + quantity, e.g. "3 Gold Coins".
-	// Non-stackable items just return their raw name (unaffected by quantity).
 	public static string GetDisplayText(string itemName, int quantity)
 	{
 		if (!IsStackable(itemName))
@@ -64,17 +58,11 @@ public static class ItemDatabase
 		return quantity + " " + name;
 	}
 
-	// Display name for ONE instance of a non-stackable item, e.g.
-	// "Bones" -> "Bone". Falls back to the raw item name if no override
-	// is defined, so new items work without needing an entry right away.
 	public static string GetSingleInstanceName(string itemName)
 	{
 		return _singleInstanceName.GetValueOrDefault(itemName, itemName);
 	}
 
-	// Examine text for an inventory item. Falls back to a generic line so
-	// new items never crash the examine flow, just look a bit plain until
-	// someone writes real flavor text for them.
 	public static string GetExamineText(string itemName)
 	{
 		return _examineText.GetValueOrDefault(itemName, "It's " + itemName + ". Nothing more to say about it.");

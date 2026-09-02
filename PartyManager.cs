@@ -29,8 +29,6 @@ public partial class PartyManager : Node
 		Instance = this;
 	}
 
-	// Called by a character node (e.g. Player.cs) in its own _Ready() to
-	// announce "I exist, here are my nodes, this is my party slot."
 	public void RegisterPartyMember(int partyIndex, Node character, Inventory inventory, Equipment equipment, PlayerStats stats)
 	{
 		if (partyIndex < 0 || partyIndex >= MaxPartySize)
@@ -47,19 +45,12 @@ public partial class PartyManager : Node
 			Stats = stats
 		};
 
-		// If this slot happens to be the active one (slot 0 at game
-		// start, most likely), tell everyone listening (UI, etc.) that
-		// there's now an active character to read from. Registration
-		// order between the three Player instances doesn't matter --
-		// whichever one carries PartyIndex 0 fires this.
 		if (partyIndex == _activeIndex)
 		{
 			EmitSignal(SignalName.ActiveCharacterChanged);
 		}
 	}
 
-	// Switches control to a different party slot (0, 1, or 2). No-op if
-	// that slot has no registered character yet, or is already active.
 	public void SetActiveIndex(int partyIndex)
 	{
 		if (partyIndex < 0 || partyIndex >= MaxPartySize) return;
@@ -78,9 +69,32 @@ public partial class PartyManager : Node
 	public Equipment GetActiveEquipment() => _party[_activeIndex]?.Equipment;
 	public PlayerStats GetActiveStats() => _party[_activeIndex]?.Stats;
 
-	// Global party-switch hotkeys. Lives here (not on Player.cs) because
-	// it has to work regardless of which character is currently active --
-	// an inactive character stops processing input entirely.
+	// Teleports every OTHER registered party member (released or not) to
+	// the caster's position, fanned out slightly so they don't spawn
+	// perfectly stacked. Called by Equipment.UseEquipped() when a Ring
+	// of Recall (or any future item with AbilityId == "recall_party") is
+	// used.
+	public void RecallPartyTo(Node3D caster)
+	{
+		if (caster == null) return;
+
+		Vector3 casterPos = caster.GlobalPosition;
+
+		for (int i = 0; i < MaxPartySize; i++)
+		{
+			if (!_party[i].HasValue) continue;
+			if (_party[i].Value.Character is not Node3D characterNode) continue;
+			if (characterNode == caster) continue;
+
+			float angle = i * Mathf.Pi * 2f / MaxPartySize;
+			Vector3 offset = new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle)) * 1.2f;
+
+			characterNode.GlobalPosition = casterPos + offset;
+		}
+
+		GD.Print("Recall cast — party gathered.");
+	}
+
 	public override void _UnhandledInput(InputEvent @event)
 	{
 		if (@event is InputEventKey keyEvent && keyEvent.Pressed && !keyEvent.Echo)

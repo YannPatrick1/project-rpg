@@ -9,7 +9,7 @@ public partial class Chest : StaticBody3D, ILootable, IExaminable
 
 	// Dull Sword is a 100% guaranteed drop -- it's just always in the list,
 	// no randomness involved (unlike the NPC's chance-based Key drop).
-	public List<string> Items { get; set; } = new List<string> { "Dull Sword" };
+	public List<string> Items { get; set; } = new List<string> { "Dull Sword", "Ring of Recall" };
 
 	// Snapshot of the chest's starting loot, taken once at _Ready. Items
 	// itself gets emptied out as the player loots it, so this is what the

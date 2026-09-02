@@ -4,10 +4,6 @@ using System.Collections.Generic;
 
 public partial class Player : CharacterBody3D
 {
-	// Which of the 3 party slots this instance is. Set this to 0, 1, or 2
-	// in the Inspector for each of the three Player instances in the
-	// world scene -- exactly one should be 0, one should be 1, one
-	// should be 2. The character with PartyIndex 0 starts in control.
 	[Export] public int PartyIndex = 0;
 
 	private SpringArm3D _springArm;
@@ -34,6 +30,12 @@ public partial class Player : CharacterBody3D
 
 	[Export] public double AttackIntervalSeconds = 1.2;
 
+	// How far behind (and to the side) of the active character this one
+	// tries to stand while following. Tune in the Inspector per-instance
+	// if you want a looser or tighter formation.
+	[Export] public float FollowDistance = 2.5f;
+	[Export] public float FollowStopDistance = 1.2f;
+
 	private static readonly Color WalkIndicatorColor = new Color(1f, 0.85f, 0f);
 	private static readonly Color InteractIndicatorColor = new Color(0.85f, 0.1f, 0.1f);
 
@@ -55,9 +57,12 @@ public partial class Player : CharacterBody3D
 	private Npc _attackTarget = null;
 	private double _attackCooldown = 0;
 
-	// True if this instance is the party member currently under player
-	// control. Everything below -- camera, mouse input, click-to-move --
-	// checks this before acting.
+	// True while this character is not following the active character --
+	// toggled with the R key, only while this character is itself active.
+	// A released character just holds its ground when control moves
+	// elsewhere, instead of walking back to the group.
+	private bool _isReleased = false;
+
 	public bool IsActiveCharacter =>
 		PartyManager.Instance != null && PartyManager.Instance.IsActiveIndex(PartyIndex);
 
@@ -84,9 +89,6 @@ public partial class Player : CharacterBody3D
 		UpdateCameraState();
 	}
 
-	// Only the active character's camera should be Current -- Godot
-	// only ever renders through one Camera3D at a time, so switching
-	// control means switching which character's camera is live.
 	private void UpdateCameraState()
 	{
 		_camera.Current = IsActiveCharacter;
@@ -103,11 +105,16 @@ public partial class Player : CharacterBody3D
 
 		if (!IsActiveCharacter)
 		{
-			// Inactive party members just hold their ground for now --
-			// no follow-AI yet, that's a future pass. Gravity above still
-			// applies so they don't float if standing on uneven terrain.
-			velocity.X = 0;
-			velocity.Z = 0;
+			if (_isReleased)
+			{
+				velocity.X = 0;
+				velocity.Z = 0;
+			}
+			else
+			{
+				ProcessFollow(ref velocity);
+			}
+
 			Velocity = velocity;
 			MoveAndSlide();
 			return;
@@ -169,6 +176,52 @@ public partial class Player : CharacterBody3D
 		MoveAndSlide();
 
 		UpdateCameraRotation();
+	}
+
+	// Walks this (inactive, non-released) character toward a point
+	// behind and to the side of whoever's currently active. Recomputed
+	// every physics frame off the leader's live position/facing, so the
+	// formation drifts naturally as the leader moves and turns.
+	private void ProcessFollow(ref Vector3 velocity)
+	{
+		var leader = PartyManager.Instance.GetActiveCharacter() as Node3D;
+
+		if (leader == null || leader == this)
+		{
+			velocity.X = 0;
+			velocity.Z = 0;
+			return;
+		}
+
+		Vector3 behind = leader.GlobalTransform.Basis.Z.Normalized() * FollowDistance;
+		float sideSign = (PartyIndex % 2 == 0) ? -1f : 1f;
+		Vector3 side = leader.GlobalTransform.Basis.X.Normalized() * (sideSign * 1.5f);
+		Vector3 followPoint = leader.GlobalPosition + behind + side;
+
+		Vector3 toTarget = followPoint - GlobalPosition;
+		toTarget.Y = 0;
+		float distance = toTarget.Length();
+
+		if (distance < FollowStopDistance)
+		{
+			velocity.X = 0;
+			velocity.Z = 0;
+		}
+		else
+		{
+			Vector3 moveDir = toTarget.Normalized();
+			velocity.X = moveDir.X * Speed;
+			velocity.Z = moveDir.Z * Speed;
+			LookAt(GlobalPosition + moveDir, Vector3.Up);
+		}
+	}
+
+	private void ToggleReleased()
+	{
+		_isReleased = !_isReleased;
+		GD.Print(_isReleased
+			? Name + " released from the party — will hold position when not active."
+			: Name + " rejoined the party — will follow when not active.");
 	}
 
 	private void UpdateCameraRotation()
@@ -256,6 +309,11 @@ public partial class Player : CharacterBody3D
 	public override void _UnhandledInput(InputEvent @event)
 	{
 		if (!IsActiveCharacter) return;
+
+		if (@event is InputEventKey keyEvent && keyEvent.Pressed && !keyEvent.Echo && keyEvent.Keycode == Key.R)
+		{
+			ToggleReleased();
+		}
 
 		if (@event is InputEventMouseMotion mouseMotion && Input.IsMouseButtonPressed(MouseButton.Middle))
 		{
@@ -515,8 +573,6 @@ public partial class Player : CharacterBody3D
 			PrintDefaultUseMessage();
 		}
 	}
-
-	// --- Generic right-click context menu helpers ---
 
 	private void AddContextMenuOption(string label, Action action)
 	{

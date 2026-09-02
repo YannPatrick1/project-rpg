@@ -10,6 +10,7 @@
 [ext_resource type="Script" uid="uid://bx04vk4hu8qhn" path="res://EquipmentDatabase.cs" id="8_wse8f"]
 [ext_resource type="Script" uid="uid://bu2ng2he8w8xd" path="res://EquipmentData.cs" id="9_ioo17"]
 [ext_resource type="Resource" uid="uid://0o7r0xgvdpsa" path="res://equipment/Dull_Sword.tres" id="10_wse8f"]
+[ext_resource type="Resource" uid="uid://c8uw2nc0x8r8f" path="res://equipment/Ring of Recall.tres" id="11_ic0uy"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_twpm2"]
 albedo_color = Color(0.27450982, 0.50980395, 0.19607843, 1)
@@ -89,6 +90,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1, -4)
 
 [node name="EquipmentDatabase" type="Node" parent="." unique_id=1704149469]
 script = ExtResource("8_wse8f")
-Entries = Array[ExtResource("9_ioo17")]([ExtResource("10_wse8f")])
+Entries = Array[ExtResource("9_ioo17")]([ExtResource("10_wse8f"), ExtResource("11_ic0uy")])
 
 [node name="ItemContextMenu" type="PopupMenu" parent="." unique_id=1487027277]
+
+[node name="EquipmentContextMenu" type="PopupMenu" parent="." unique_id=1559592034]

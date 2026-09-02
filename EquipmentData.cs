@@ -1,15 +1,8 @@
 using Godot;
 
-// A Resource, not a Node -- this means each equipment item's stats live
-// in their own .tres file, fully editable in the Inspector, with no code
-// changes needed to add or rebalance gear. This is the pattern to follow
-// for every future equipment item.
 [GlobalClass]
 public partial class EquipmentData : Resource
 {
-	// Must exactly match the item name string used everywhere else
-	// (Chest loot lists, ItemDatabase, etc.) -- this is how the game
-	// looks up "does this inventory item have equipment stats?"
 	[Export] public string ItemName = "";
 
 	[Export] public EquipSlot Slot = EquipSlot.Body;
@@ -23,4 +16,15 @@ public partial class EquipmentData : Resource
 	[Export] public int AgilityBonus = 0;
 	[Export] public int MagicBonus = 0;
 	[Export] public int ResistanceBonus = 0;
+
+	// Minimal "use an ability while equipped" hook -- not the full
+	// AbilityData/E-AP system from the Combat & Progression Design Doc
+	// yet, just enough to let a specific equipped item do something when
+	// right-clicked and "Use" is chosen. AbilityId is matched against a
+	// switch statement in Equipment.UseEquipped(); more abilities can be
+	// added there as they come up, and this can be generalized into a
+	// real AbilityData resource later without changing this field.
+	[ExportGroup("Ability")]
+	[Export] public bool IsUsable = false;
+	[Export] public string AbilityId = "";
 }
