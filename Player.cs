@@ -30,11 +30,9 @@ public partial class Player : CharacterBody3D
 
 	[Export] public double AttackIntervalSeconds = 1.2;
 
-	// How far behind (and to the side) of the active character this one
-	// tries to stand while following. Tune in the Inspector per-instance
-	// if you want a looser or tighter formation.
 	[Export] public float FollowDistance = 2.5f;
 	[Export] public float FollowStopDistance = 1.2f;
+	[Export] public float MaxRegroupDistance = 8f;
 
 	private static readonly Color WalkIndicatorColor = new Color(1f, 0.85f, 0f);
 	private static readonly Color InteractIndicatorColor = new Color(0.85f, 0.1f, 0.1f);
@@ -56,12 +54,6 @@ public partial class Player : CharacterBody3D
 
 	private Npc _attackTarget = null;
 	private double _attackCooldown = 0;
-
-	// True while this character is not following the active character --
-	// toggled with the R key, only while this character is itself active.
-	// A released character just holds its ground when control moves
-	// elsewhere, instead of walking back to the group.
-	private bool _isReleased = false;
 
 	public bool IsActiveCharacter =>
 		PartyManager.Instance != null && PartyManager.Instance.IsActiveIndex(PartyIndex);
@@ -105,7 +97,7 @@ public partial class Player : CharacterBody3D
 
 		if (!IsActiveCharacter)
 		{
-			if (_isReleased)
+			if (PartyManager.Instance.IsReleased(PartyIndex))
 			{
 				velocity.X = 0;
 				velocity.Z = 0;
@@ -179,11 +171,20 @@ public partial class Player : CharacterBody3D
 	}
 
 	// Walks this (inactive, non-released) character toward a point
-	// behind and to the side of whoever's currently active. Recomputed
-	// every physics frame off the leader's live position/facing, so the
-	// formation drifts naturally as the leader moves and turns.
+	// behind and to the side of whoever's currently active -- unless
+	// that active character is itself released, in which case they've
+	// left the group and there's nothing to follow.
 	private void ProcessFollow(ref Vector3 velocity)
 	{
+		int leaderIndex = PartyManager.Instance.GetActiveIndex();
+
+		if (PartyManager.Instance.IsReleased(leaderIndex))
+		{
+			velocity.X = 0;
+			velocity.Z = 0;
+			return;
+		}
+
 		var leader = PartyManager.Instance.GetActiveCharacter() as Node3D;
 
 		if (leader == null || leader == this)
@@ -218,10 +219,16 @@ public partial class Player : CharacterBody3D
 
 	private void ToggleReleased()
 	{
-		_isReleased = !_isReleased;
-		GD.Print(_isReleased
-			? Name + " released from the party — will hold position when not active."
-			: Name + " rejoined the party — will follow when not active.");
+		if (PartyManager.Instance == null) return;
+
+		if (PartyManager.Instance.IsReleased(PartyIndex))
+		{
+			PartyManager.Instance.Rejoin(PartyIndex, MaxRegroupDistance);
+		}
+		else
+		{
+			PartyManager.Instance.Release(PartyIndex);
+		}
 	}
 
 	private void UpdateCameraRotation()
