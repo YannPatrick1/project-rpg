@@ -3,6 +3,11 @@ using System.Collections.Generic;
 
 public partial class Npc : CharacterBody3D, IExaminable
 {
+	// Fired the moment this NPC dies, before the respawn timer starts.
+	// BattleManager listens to this to know when to end an instanced
+	// battle, instead of polling Visible every frame.
+	[Signal] public delegate void DiedEventHandler();
+
 	[ExportGroup("Identity")]
 	[Export] public string NpcName = "Goblin";
 
@@ -61,6 +66,7 @@ public partial class Npc : CharacterBody3D, IExaminable
 	{
 		GD.Print("NPC died");
 		_isDead = true;
+		EmitSignal(SignalName.Died);
 
 		if (LootPileScene != null)
 		{
@@ -103,9 +109,6 @@ public partial class Npc : CharacterBody3D, IExaminable
 		_respawnTimer.Start();
 	}
 
-	// Looks for an existing loot pile within "radius" units of "position".
-	// Used so loot from a new death merges into a pile that's already there
-	// instead of spawning an overlapping duplicate.
 	private LootPile FindNearbyLootPile(Vector3 position, float radius)
 	{
 		foreach (Node node in GetTree().GetNodesInGroup("loot_piles"))

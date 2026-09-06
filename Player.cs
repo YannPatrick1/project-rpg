@@ -301,6 +301,7 @@ public partial class Player : CharacterBody3D
 
 		var indicator = ClickIndicatorScene.Instantiate<ClickIndicator>();
 		GetParent().AddChild(indicator);
+		indicator.ProcessMode = ProcessModeEnum.Always;
 		indicator.Play(worldPosition, color);
 	}
 
@@ -311,6 +312,16 @@ public partial class Player : CharacterBody3D
 		_attackCooldown = 0;
 		_moveTarget = npc.GlobalPosition;
 		ResetStuckCheck();
+	}
+	// Called by BattleManager right before teleporting this character into
+	// or out of an arena, so no leftover move/attack state carries over
+	// across the teleport.
+	public void CancelMovementAndActions()
+	{
+		_moveTarget = null;
+		_pendingAction = null;
+		_attackTarget = null;
+		Velocity = Vector3.Zero;
 	}
 
 	public override void _UnhandledInput(InputEvent @event)

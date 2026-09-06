@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://cpcejntcp0u8t"]
+
+[ext_resource type="Script" uid="uid://c7750po3mvans" path="res://BattleManager.cs" id="1_r0ul7"]
+[ext_resource type="Resource" uid="uid://dob8sbhm320ap" path="res://starting_area_encounters.tres" id="2_c1csy"]
+
+[node name="BattleManager" type="Node" unique_id=1717707652]
+script = ExtResource("1_r0ul7")
+EncounterTable = ExtResource("2_c1csy")

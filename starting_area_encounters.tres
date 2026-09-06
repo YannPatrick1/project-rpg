@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="EncounterTable" format=3 uid="uid://dob8sbhm320ap"]
+
+[ext_resource type="Script" uid="uid://dvsyi7f4x4own" path="res://EncounterTable.cs" id="1_16ax6"]
+[ext_resource type="PackedScene" uid="uid://bd1e6n5d124oq" path="res://npc.tscn" id="1_ck8ha"]
+
+[resource]
+script = ExtResource("1_16ax6")
+PossibleEnemies = Array[PackedScene]([ExtResource("1_ck8ha")])
+metadata/_custom_type_script = "uid://dvsyi7f4x4own"

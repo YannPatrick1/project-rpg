@@ -1,12 +1,9 @@
 using Godot;
 
-// Autoload singleton (registered in Project Settings -> Autoload).
-// Holds the full 3-character party roster, tracks which slot is active,
-// and now also owns released/joined state for every member -- moved
-// here from individual Player instances so cascading rules ("last
-// member left alone auto-releases", "regrouping sweeps nearby
-// stragglers") can see the whole group at once instead of each
-// character only knowing about itself.
+// Autoload singleton. Holds the full 3-character party roster, tracks
+// which slot is active, and owns released/joined state for every
+// member. ProcessMode is set to Always so the 1/2/3 hotkeys still work
+// during an instanced battle (when the rest of the tree is paused).
 public partial class PartyManager : Node
 {
 	public const int MaxPartySize = 3;
@@ -30,6 +27,7 @@ public partial class PartyManager : Node
 	public override void _Ready()
 	{
 		Instance = this;
+		ProcessMode = ProcessModeEnum.Always;
 	}
 
 	public void RegisterPartyMember(int partyIndex, Node character, Inventory inventory, Equipment equipment, PlayerStats stats)
@@ -54,11 +52,33 @@ public partial class PartyManager : Node
 		}
 	}
 
+	public bool HasMember(int partyIndex)
+	{
+		if (partyIndex < 0 || partyIndex >= MaxPartySize) return false;
+		return _party[partyIndex].HasValue;
+	}
+
+	public Node GetCharacter(int partyIndex)
+	{
+		if (partyIndex < 0 || partyIndex >= MaxPartySize) return null;
+		return _party[partyIndex]?.Character;
+	}
+
 	public void SetActiveIndex(int partyIndex)
 	{
 		if (partyIndex < 0 || partyIndex >= MaxPartySize) return;
 		if (!_party[partyIndex].HasValue) return;
 		if (partyIndex == _activeIndex) return;
+
+		// During a battle, only the party members actually IN that
+		// battle can be swapped to -- prevents pulling a left-behind
+		// (frozen) party member into control mid-fight.
+		if (BattleManager.Instance != null && BattleManager.Instance.IsInBattle
+			&& !BattleManager.Instance.IsPartyIndexInBattle(partyIndex))
+		{
+			GD.Print("Can't switch to a party member who isn't in this battle.");
+			return;
+		}
 
 		_activeIndex = partyIndex;
 		EmitSignal(SignalName.ActiveCharacterChanged);
@@ -99,11 +119,6 @@ public partial class PartyManager : Node
 		GD.Print("Recall cast — party gathered.");
 	}
 
-	// Releases the given party member. If this leaves exactly one other
-	// registered member still joined, that last member is automatically
-	// released too -- a group of one doesn't mean anything (there's no
-	// one left for it to lead or follow), so it collapses into everyone
-	// being solo rather than leaving one character stuck half-grouped.
 	public void Release(int partyIndex)
 	{
 		if (partyIndex < 0 || partyIndex >= MaxPartySize) return;
@@ -131,14 +146,6 @@ public partial class PartyManager : Node
 		}
 	}
 
-	// Attempts to rejoin the given party member. Requires being within
-	// maxDistance of at least one other registered party member (joined
-	// or released -- being near anyone confirms you've walked back,
-	// even if that "anyone" happens to be another straggler). On
-	// success, sweeps every OTHER released member and brings back
-	// anyone now within range of a joined member, repeating until
-	// nothing more comes back -- so one R press regroups everyone
-	// standing nearby instead of needing one press per character.
 	public void Rejoin(int partyIndex, float maxDistance)
 	{
 		if (partyIndex < 0 || partyIndex >= MaxPartySize) return;
