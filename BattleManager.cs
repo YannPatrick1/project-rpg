@@ -154,8 +154,21 @@ public partial class BattleManager : Node
 		SpawnEnemies(arenaCenter);
 
 		_inBattle = true;
-		GetTree().Paused = true;
+		PauseAfterPhysicsSettles();
 	}
+	// Waits for two real physics steps so the freshly spawned enemies are
+	// fully registered with the physics world, THEN pauses the game.
+	private async void PauseAfterPhysicsSettles()
+	{
+		await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		if (_inBattle)
+		{
+			GetTree().Paused = true;
+		}
+	}
+	
 
 	private void SpawnEnemies(Vector3 arenaCenter)
 	{
@@ -181,11 +194,17 @@ public partial class BattleManager : Node
 			if (scene == null) continue;
 
 			var npc = scene.Instantiate<Npc>();
-			worldNode.AddChild(npc);
 
 			float angle = i * Mathf.Pi * 2f / Mathf.Max(enemyCount, 1);
 			Vector3 offset = new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle)) * 3.5f;
-			npc.GlobalPosition = arenaCenter + offset + Vector3.Back * 3f;
+
+			// Set the position BEFORE adding to the scene, so the physics
+			// body is created at the right spot instead of being created at
+			// the default position and moved afterward. (This assumes the
+			// World node sits at 0,0,0, which is the default.)
+			npc.Position = arenaCenter + offset + Vector3.Back * 3f + Vector3.Up * 1.0f;
+
+			worldNode.AddChild(npc);
 
 			npc.ProcessMode = ProcessModeEnum.Always;
 			npc.Died += () => OnEnemyDied(npc);

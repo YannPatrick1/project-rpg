@@ -48,7 +48,26 @@ public partial class Npc : CharacterBody3D, IExaminable
 		_respawnTimer.Timeout += OnRespawnTimerTimeout;
 
 		_collisionShape = GetNode<CollisionShape3D>("CollisionShape3D");
+		_collisionShape.Disabled = false; // guard against a bad saved state
 		_meshInstance = GetNodeOrNull<MeshInstance3D>("MeshInstance3D");
+	}
+		public override void _PhysicsProcess(double delta)
+	{
+		if (_isDead) return;
+
+		Vector3 velocity = Velocity;
+
+		if (!IsOnFloor())
+		{
+			velocity += GetGravity() * (float)delta;
+		}
+		else
+		{
+			velocity.Y = 0;
+		}
+
+		Velocity = velocity;
+		MoveAndSlide();
 	}
 
 	public void TakeDamage(int amount)
