@@ -6,7 +6,7 @@ public partial class Player : CharacterBody3D
 {
 	[Export] public int PartyIndex = 0;
 
-	private SpringArm3D _springArm;
+	private SpringArm3D _springArm; // used as the head/pitch pivot (Spring Length = 0)
 	private Camera3D _camera;
 	private PopupMenu _contextMenu;
 	private List<Action> _contextMenuActions = new();
@@ -21,11 +21,8 @@ public partial class Player : CharacterBody3D
 	private const float InteractRange = 3.0f;
 
 	[Export] public float MouseSensitivity = 0.15f;
-	[Export] public float ZoomSpeed = 0.5f;
-	[Export] public float MinZoom = 2.0f;
-	[Export] public float MaxZoom = 12.0f;
-	[Export] public float MinPitch = -60f;
-	[Export] public float MaxPitch = -5f;
+	[Export] public float MinPitch = -85f;
+	[Export] public float MaxPitch = 85f;
 
 	[Export] public double AttackIntervalSeconds = 1.2;
 
@@ -34,7 +31,7 @@ public partial class Player : CharacterBody3D
 	[Export] public float MaxRegroupDistance = 8f;
 
 	private float _cameraYaw = 0f;
-	private float _cameraPitch = -20f;
+	private float _cameraPitch = 0f;
 
 	private Npc _attackTarget = null;
 	private double _attackCooldown = 0;
@@ -43,6 +40,11 @@ public partial class Player : CharacterBody3D
 	private bool _isDormant = false;
 	private uint _defaultCollisionLayer;
 	private uint _defaultCollisionMask;
+
+	// Shared by every Player instance: whether the mouse is currently
+	// captured (hidden, drives the camera) or free (visible, for menus).
+	private static bool _mouseCaptured = true;
+	private static Label _crosshair;
 
 	public bool IsActiveCharacter =>
 		PartyManager.Instance != null && PartyManager.Instance.IsActiveIndex(PartyIndex);
@@ -62,6 +64,8 @@ public partial class Player : CharacterBody3D
 		_equipment = GetNode<Equipment>("PlayerEquipment");
 		_stats = GetNode<PlayerStats>("PlayerStats");
 
+		_cameraYaw = Mathf.RadToDeg(Rotation.Y);
+
 		PartyManager.Instance.RegisterPartyMember(PartyIndex, this, _inventory, _equipment, _stats);
 		PartyManager.Instance.ActiveCharacterChanged += OnActiveCharacterChanged;
 
@@ -71,7 +75,43 @@ public partial class Player : CharacterBody3D
 			PartyManager.Instance.SetDormant(PartyIndex, true);
 		}
 
+		if (!IsInstanceValid(_crosshair))
+		{
+			CreateCrosshair();
+		}
+		SetMouseCaptured(true);
+
 		UpdateCameraState();
+		ApplyLook();
+	}
+
+	// A simple "+" in the middle of the screen, built in code so there's
+	// no extra scene setup. Mouse Filter = Ignore so it never swallows clicks.
+	private void CreateCrosshair()
+	{
+		var layer = new CanvasLayer();
+		AddChild(layer);
+
+		_crosshair = new Label
+		{
+			Text = "+",
+			HorizontalAlignment = HorizontalAlignment.Center,
+			VerticalAlignment = VerticalAlignment.Center,
+			MouseFilter = Control.MouseFilterEnum.Ignore
+		};
+		layer.AddChild(_crosshair);
+		_crosshair.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+	}
+
+	private static void SetMouseCaptured(bool captured)
+	{
+		_mouseCaptured = captured;
+		Input.MouseMode = captured ? Input.MouseModeEnum.Captured : Input.MouseModeEnum.Visible;
+
+		if (GodotObject.IsInstanceValid(_crosshair))
+		{
+			_crosshair.Visible = captured;
+		}
 	}
 
 	// Called by PartyManager.SetDormant. Hides the character, turns its
@@ -93,12 +133,34 @@ public partial class Player : CharacterBody3D
 
 	private void OnActiveCharacterChanged()
 	{
+		if (IsActiveCharacter)
+		{
+			// Followers get turned by LookAt while inactive, so re-sync the
+			// look angle to wherever this character is actually facing.
+			_cameraYaw = Mathf.RadToDeg(Rotation.Y);
+			ApplyLook();
+		}
+
 		UpdateCameraState();
 	}
 
 	private void UpdateCameraState()
 	{
 		_camera.Current = IsActiveCharacter;
+
+		// First person: hide your own body while you're looking out of it.
+		var mesh = GetNodeOrNull<MeshInstance3D>("MeshInstance3D");
+		if (mesh != null)
+		{
+			mesh.Visible = !IsActiveCharacter;
+		}
+	}
+
+	// Yaw turns the whole character; pitch tilts only the camera pivot.
+	private void ApplyLook()
+	{
+		Rotation = new Vector3(0, Mathf.DegToRad(_cameraYaw), 0);
+		_springArm.Rotation = new Vector3(Mathf.DegToRad(_cameraPitch), 0, 0);
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -136,15 +198,16 @@ public partial class Player : CharacterBody3D
 			velocity.Y = JumpVelocity;
 		}
 
+		// Movement is relative to where the character is facing. Only yaw
+		// lives on the body (pitch is on the camera pivot), so the body's
+		// basis is exactly the "which way is forward" we want.
 		Vector2 inputDir = Input.GetVector("move_left", "move_right", "move_forward", "move_back");
-		Vector3 rawDirection = new Vector3(inputDir.X, 0, inputDir.Y);
-		Vector3 direction = rawDirection.Rotated(Vector3.Up, Mathf.DegToRad(_cameraYaw)).Normalized();
+		Vector3 direction = (GlobalTransform.Basis * new Vector3(inputDir.X, 0, inputDir.Y)).Normalized();
 
 		if (direction != Vector3.Zero)
 		{
 			velocity.X = direction.X * Speed;
 			velocity.Z = direction.Z * Speed;
-			LookAt(GlobalPosition + direction, Vector3.Up);
 		}
 		else
 		{
@@ -154,8 +217,6 @@ public partial class Player : CharacterBody3D
 
 		Velocity = velocity;
 		MoveAndSlide();
-
-		UpdateCameraRotation();
 	}
 
 	// Walks this (inactive, non-released) character toward a point
@@ -219,13 +280,8 @@ public partial class Player : CharacterBody3D
 		}
 	}
 
-	private void UpdateCameraRotation()
-	{
-		_springArm.Rotation = new Vector3(Mathf.DegToRad(_cameraPitch), Mathf.DegToRad(_cameraYaw) - Rotation.Y, 0);
-	}
-
-	// With direct control there's no auto-walk: click an NPC to target it,
-	// and the auto-attack fires on its cooldown whenever you're in range.
+	// Click an NPC to target it; the auto-attack fires on its cooldown
+	// whenever you're in range.
 	private void ProcessCombat(double delta)
 	{
 		if (_attackTarget == null) return;
@@ -282,34 +338,48 @@ public partial class Player : CharacterBody3D
 	{
 		if (!IsActiveCharacter) return;
 
+		if (@event.IsActionPressed("ui_cancel"))
+		{
+			SetMouseCaptured(!_mouseCaptured);
+			return;
+		}
+
 		if (@event is InputEventKey keyEvent && keyEvent.Pressed && !keyEvent.Echo && keyEvent.Keycode == Key.R)
 		{
 			ToggleReleased();
 		}
 
-		if (@event is InputEventMouseMotion mouseMotion && Input.IsMouseButtonPressed(MouseButton.Middle))
+		bool captured = Input.MouseMode == Input.MouseModeEnum.Captured;
+
+		if (@event is InputEventMouseMotion mouseMotion && captured)
 		{
 			_cameraYaw -= mouseMotion.Relative.X * MouseSensitivity;
 			_cameraPitch = Mathf.Clamp(_cameraPitch - mouseMotion.Relative.Y * MouseSensitivity, MinPitch, MaxPitch);
+			ApplyLook();
 		}
 
 		if (@event is InputEventMouseButton mouseButton && mouseButton.Pressed)
 		{
-			if (mouseButton.ButtonIndex == MouseButton.WheelUp)
+			// Captured: clicks land on the crosshair (screen center).
+			// Free: clicks land wherever the visible cursor is.
+			Vector2 clickPos = captured
+				? GetViewport().GetVisibleRect().Size / 2f
+				: mouseButton.Position;
+
+			if (mouseButton.ButtonIndex == MouseButton.Left)
 			{
-				_springArm.SpringLength = Mathf.Clamp(_springArm.SpringLength - ZoomSpeed, MinZoom, MaxZoom);
-			}
-			else if (mouseButton.ButtonIndex == MouseButton.WheelDown)
-			{
-				_springArm.SpringLength = Mathf.Clamp(_springArm.SpringLength + ZoomSpeed, MinZoom, MaxZoom);
-			}
-			else if (mouseButton.ButtonIndex == MouseButton.Left)
-			{
-				HandleClick(mouseButton.Position, false);
+				HandleClick(clickPos, false);
 			}
 			else if (mouseButton.ButtonIndex == MouseButton.Right)
 			{
-				HandleClick(mouseButton.Position, true);
+				if (captured)
+				{
+					GD.Print("Press Esc to free the mouse for right-click menus.");
+				}
+				else
+				{
+					HandleClick(clickPos, true);
+				}
 			}
 		}
 	}
@@ -321,15 +391,15 @@ public partial class Player : CharacterBody3D
 		string selectedItem = _inventoryUI.GetSelectedItem();
 		int selectedIndex = _inventoryUI.GetSelectedIndex();
 
-		var camera = _springArm.GetNode<Camera3D>("Camera3D");
-		Vector3 rayOrigin = camera.ProjectRayOrigin(mousePos);
-		Vector3 rayDirection = camera.ProjectRayNormal(mousePos);
+		Vector3 rayOrigin = _camera.ProjectRayOrigin(mousePos);
+		Vector3 rayDirection = _camera.ProjectRayNormal(mousePos);
 		Vector3 rayEnd = rayOrigin + rayDirection * 1000f;
 
 		var spaceState = GetWorld3D().DirectSpaceState;
 		var query = PhysicsRayQueryParameters3D.Create(rayOrigin, rayEnd);
 		query.CollideWithAreas = true;
 		query.CollideWithBodies = true;
+		query.Exclude = new Godot.Collections.Array<Rid> { GetRid() }; // don't hit our own body
 
 		var result = spaceState.IntersectRay(query);
 
