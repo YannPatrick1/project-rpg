@@ -84,6 +84,7 @@ public partial class BattleManager : Node
 		{
 			var character = PartyManager.Instance.GetCharacter(index);
 			if (character is not Node3D character3D) continue;
+			PartyManager.Instance.SetDormant(index, false);
 
 			// Clear any leftover move target / pending action / attack
 			// target / velocity BEFORE teleporting, so nothing carries over
@@ -201,6 +202,7 @@ public partial class BattleManager : Node
 
 			character3D.GlobalPosition = kvp.Value;
 			character.ProcessMode = ProcessModeEnum.Inherit;
+			PartyManager.Instance.SetDormant(kvp.Key, !PartyManager.Instance.IsActiveIndex(kvp.Key));
 		}
 
 		foreach (var enemy in _allSpawnedEnemies.ToList())

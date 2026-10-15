@@ -22,6 +22,7 @@ public partial class PartyManager : Node
 
 	private PartyMember?[] _party = new PartyMember?[MaxPartySize];
 	private bool[] _released = new bool[MaxPartySize];
+	private bool[] _dormant = new bool[MaxPartySize];
 	private int _activeIndex = 0;
 
 	public override void _Ready()
@@ -70,6 +71,12 @@ public partial class PartyManager : Node
 		if (!_party[partyIndex].HasValue) return;
 		if (partyIndex == _activeIndex) return;
 
+		if (_dormant[partyIndex])
+		{
+			GD.Print("That party member isn't in the world right now.");
+			return;
+		}
+
 		// During a battle, only the party members actually IN that
 		// battle can be swapped to -- prevents pulling a left-behind
 		// (frozen) party member into control mid-fight.
@@ -91,7 +98,27 @@ public partial class PartyManager : Node
 	public Inventory GetActiveInventory() => _party[_activeIndex]?.Inventory;
 	public Equipment GetActiveEquipment() => _party[_activeIndex]?.Equipment;
 	public PlayerStats GetActiveStats() => _party[_activeIndex]?.Stats;
+	public bool IsDormant(int partyIndex)
+	{
+		if (partyIndex < 0 || partyIndex >= MaxPartySize) return false;
+		return _dormant[partyIndex];
+	}
 
+	// Dormant = hidden, non-colliding, frozen. The active character can
+	// never go dormant.
+	public void SetDormant(int partyIndex, bool dormant)
+	{
+		if (partyIndex < 0 || partyIndex >= MaxPartySize) return;
+		if (!_party[partyIndex].HasValue) return;
+		if (dormant && partyIndex == _activeIndex) return;
+
+		_dormant[partyIndex] = dormant;
+
+		if (_party[partyIndex].Value.Character is Player player)
+		{
+			player.ApplyDormant(dormant);
+		}
+	}
 	public bool IsReleased(int partyIndex)
 	{
 		if (partyIndex < 0 || partyIndex >= MaxPartySize) return false;

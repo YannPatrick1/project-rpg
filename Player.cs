@@ -17,6 +17,7 @@ public partial class Player : CharacterBody3D
 	private PlayerStats _stats;
 
 	public const float Speed = 5.0f;
+	public const float JumpVelocity = 4.5f;
 	private const float InteractRange = 3.0f;
 
 	[Export] public float MouseSensitivity = 0.15f;
@@ -26,40 +27,31 @@ public partial class Player : CharacterBody3D
 	[Export] public float MinPitch = -60f;
 	[Export] public float MaxPitch = -5f;
 
-	[Export] public PackedScene ClickIndicatorScene;
-
 	[Export] public double AttackIntervalSeconds = 1.2;
 
 	[Export] public float FollowDistance = 2.5f;
 	[Export] public float FollowStopDistance = 1.2f;
 	[Export] public float MaxRegroupDistance = 8f;
 
-	private static readonly Color WalkIndicatorColor = new Color(1f, 0.85f, 0f);
-	private static readonly Color InteractIndicatorColor = new Color(0.85f, 0.1f, 0.1f);
-
 	private float _cameraYaw = 0f;
 	private float _cameraPitch = -20f;
 
-	private Vector3? _moveTarget = null;
-	private const float ArrivalDistance = 0.2f;
-
-	private const double StuckCheckInterval = 0.3;
-	private const float StuckDistanceThreshold = 0.05f;
-	private double _stuckCheckTimer = 0;
-	private Vector3 _stuckCheckPosition;
-
-	private Action _pendingAction = null;
-	private Vector3 _pendingActionPosition;
-	private float _pendingActionRange;
-
 	private Npc _attackTarget = null;
 	private double _attackCooldown = 0;
+
+	// Dormant = hidden, non-colliding, and frozen. Set by PartyManager.
+	private bool _isDormant = false;
+	private uint _defaultCollisionLayer;
+	private uint _defaultCollisionMask;
 
 	public bool IsActiveCharacter =>
 		PartyManager.Instance != null && PartyManager.Instance.IsActiveIndex(PartyIndex);
 
 	public override void _Ready()
 	{
+		_defaultCollisionLayer = CollisionLayer;
+		_defaultCollisionMask = CollisionMask;
+
 		_springArm = GetNode<SpringArm3D>("SpringArm3D");
 		_camera = _springArm.GetNode<Camera3D>("Camera3D");
 		_contextMenu = GetNode<PopupMenu>("/root/World/LootMenu");
@@ -73,7 +65,30 @@ public partial class Player : CharacterBody3D
 		PartyManager.Instance.RegisterPartyMember(PartyIndex, this, _inventory, _equipment, _stats);
 		PartyManager.Instance.ActiveCharacterChanged += OnActiveCharacterChanged;
 
+		// Everyone except the starting active character begins hidden.
+		if (!IsActiveCharacter)
+		{
+			PartyManager.Instance.SetDormant(PartyIndex, true);
+		}
+
 		UpdateCameraState();
+	}
+
+	// Called by PartyManager.SetDormant. Hides the character, turns its
+	// collision off (layer/mask 0 = collides with nothing and nothing
+	// collides with it), and stops it from processing movement.
+	public void ApplyDormant(bool dormant)
+	{
+		_isDormant = dormant;
+		Visible = !dormant;
+		CollisionLayer = dormant ? 0 : _defaultCollisionLayer;
+		CollisionMask = dormant ? 0 : _defaultCollisionMask;
+
+		if (dormant)
+		{
+			Velocity = Vector3.Zero;
+			_attackTarget = null;
+		}
 	}
 
 	private void OnActiveCharacterChanged()
@@ -88,6 +103,8 @@ public partial class Player : CharacterBody3D
 
 	public override void _PhysicsProcess(double delta)
 	{
+		if (_isDormant) return;
+
 		Vector3 velocity = Velocity;
 
 		if (!IsOnFloor())
@@ -114,49 +131,20 @@ public partial class Player : CharacterBody3D
 
 		ProcessCombat(delta);
 
-		if (_moveTarget.HasValue)
+		if (Input.IsActionJustPressed("jump") && IsOnFloor())
 		{
-			if (_pendingAction != null)
-			{
-				float actionDistance = GlobalPosition.DistanceTo(_pendingActionPosition);
-				if (actionDistance <= _pendingActionRange)
-				{
-					velocity.X = 0;
-					velocity.Z = 0;
-					Velocity = velocity;
-					MoveAndSlide();
+			velocity.Y = JumpVelocity;
+		}
 
-					var action = _pendingAction;
-					_pendingAction = null;
-					_moveTarget = null;
+		Vector2 inputDir = Input.GetVector("move_left", "move_right", "move_forward", "move_back");
+		Vector3 rawDirection = new Vector3(inputDir.X, 0, inputDir.Y);
+		Vector3 direction = rawDirection.Rotated(Vector3.Up, Mathf.DegToRad(_cameraYaw)).Normalized();
 
-					action.Invoke();
-
-					UpdateCameraRotation();
-					return;
-				}
-			}
-
-			Vector3 toTarget = _moveTarget.Value - GlobalPosition;
-			toTarget.Y = 0;
-			float distance = toTarget.Length();
-
-			if (distance < ArrivalDistance)
-			{
-				velocity.X = 0;
-				velocity.Z = 0;
-				_moveTarget = null;
-				_pendingAction = null;
-			}
-			else
-			{
-				Vector3 moveDir = toTarget.Normalized();
-				velocity.X = moveDir.X * Speed;
-				velocity.Z = moveDir.Z * Speed;
-				LookAt(GlobalPosition + moveDir, Vector3.Up);
-
-				CheckIfStuck(delta);
-			}
+		if (direction != Vector3.Zero)
+		{
+			velocity.X = direction.X * Speed;
+			velocity.Z = direction.Z * Speed;
+			LookAt(GlobalPosition + direction, Vector3.Up);
 		}
 		else
 		{
@@ -236,6 +224,8 @@ public partial class Player : CharacterBody3D
 		_springArm.Rotation = new Vector3(Mathf.DegToRad(_cameraPitch), Mathf.DegToRad(_cameraYaw) - Rotation.Y, 0);
 	}
 
+	// With direct control there's no auto-walk: click an NPC to target it,
+	// and the auto-attack fires on its cooldown whenever you're in range.
 	private void ProcessCombat(double delta)
 	{
 		if (_attackTarget == null) return;
@@ -246,20 +236,7 @@ public partial class Player : CharacterBody3D
 			return;
 		}
 
-		float distance = GlobalPosition.DistanceTo(_attackTarget.GlobalPosition);
-
-		if (distance > InteractRange)
-		{
-			_moveTarget = _attackTarget.GlobalPosition;
-			return;
-		}
-
-		_moveTarget = null;
-		Vector3 lookTarget = new Vector3(_attackTarget.GlobalPosition.X, GlobalPosition.Y, _attackTarget.GlobalPosition.Z);
-		if (lookTarget != GlobalPosition)
-		{
-			LookAt(lookTarget, Vector3.Up);
-		}
+		if (!IsInRange(_attackTarget)) return;
 
 		_attackCooldown -= delta;
 		if (_attackCooldown <= 0)
@@ -269,57 +246,34 @@ public partial class Player : CharacterBody3D
 		}
 	}
 
-	private void CheckIfStuck(double delta)
+	private bool IsInRange(Node3D target)
 	{
-		_stuckCheckTimer += delta;
-
-		if (_stuckCheckTimer >= StuckCheckInterval)
-		{
-			float movedDistance = GlobalPosition.DistanceTo(_stuckCheckPosition);
-
-			if (movedDistance < StuckDistanceThreshold)
-			{
-				GD.Print("Stuck on something — stopping here.");
-				_moveTarget = null;
-				_pendingAction = null;
-			}
-
-			_stuckCheckPosition = GlobalPosition;
-			_stuckCheckTimer = 0;
-		}
+		return target != null && GlobalPosition.DistanceTo(target.GlobalPosition) <= InteractRange;
 	}
 
-	private void ResetStuckCheck()
+	private bool CheckReach(Node3D target, string verb = "pick that up")
 	{
-		_stuckCheckPosition = GlobalPosition;
-		_stuckCheckTimer = 0;
-	}
-
-	private void SpawnClickIndicator(Vector3 worldPosition, Color color)
-	{
-		if (ClickIndicatorScene == null) return;
-
-		var indicator = ClickIndicatorScene.Instantiate<ClickIndicator>();
-		GetParent().AddChild(indicator);
-		indicator.ProcessMode = ProcessModeEnum.Always;
-		indicator.Play(worldPosition, color);
+		if (IsInRange(target)) return true;
+		GD.Print("Too far away to " + verb + ".");
+		return false;
 	}
 
 	private void StartAttacking(Npc npc)
 	{
-		_pendingAction = null;
 		_attackTarget = npc;
 		_attackCooldown = 0;
-		_moveTarget = npc.GlobalPosition;
-		ResetStuckCheck();
+
+		if (!IsInRange(npc))
+		{
+			GD.Print("Get closer to attack.");
+		}
 	}
+
 	// Called by BattleManager right before teleporting this character into
-	// or out of an arena, so no leftover move/attack state carries over
+	// or out of an arena, so no leftover attack state carries over
 	// across the teleport.
 	public void CancelMovementAndActions()
 	{
-		_moveTarget = null;
-		_pendingAction = null;
 		_attackTarget = null;
 		Velocity = Vector3.Zero;
 	}
@@ -363,7 +317,6 @@ public partial class Player : CharacterBody3D
 	private void HandleClick(Vector2 mousePos, bool isRightClick)
 	{
 		_attackTarget = null;
-		_pendingAction = null;
 
 		string selectedItem = _inventoryUI.GetSelectedItem();
 		int selectedIndex = _inventoryUI.GetSelectedIndex();
@@ -392,12 +345,10 @@ public partial class Player : CharacterBody3D
 		}
 
 		var collider = result["collider"].AsGodotObject();
-		Vector3 hitPosition = (Vector3)result["position"];
 		GD.Print("Clicked on: ", collider, " | Right click: ", isRightClick);
 
 		if (selectedItem != null)
 		{
-			SpawnClickIndicator(hitPosition, InteractIndicatorColor);
 			UseItemOn(selectedItem, selectedIndex, collider);
 			_inventoryUI.ClearSelection();
 			return;
@@ -405,8 +356,7 @@ public partial class Player : CharacterBody3D
 
 		if (!isRightClick && collider is KeyPickup keyPickup)
 		{
-			SpawnClickIndicator(hitPosition, InteractIndicatorColor);
-			WalkToAndPickUpKey(keyPickup);
+			TryPickUpKey(keyPickup);
 		}
 		else if (isRightClick && collider is KeyPickup keyPickupMenu)
 		{
@@ -414,19 +364,7 @@ public partial class Player : CharacterBody3D
 		}
 		else if (!isRightClick && collider is LootPile lootPile && lootPile.Items.Count > 0)
 		{
-			SpawnClickIndicator(hitPosition, InteractIndicatorColor);
-
-			Vector3 targetPos = lootPile.GlobalPosition;
-			_moveTarget = targetPos;
-			_pendingActionPosition = targetPos;
-			_pendingActionRange = InteractRange;
-			_pendingAction = () =>
-			{
-				if (!IsInstanceValid(lootPile) || lootPile.Items.Count == 0) return;
-				string topItem = lootPile.Items[0];
-				GrabItem(lootPile, topItem);
-			};
-			ResetStuckCheck();
+			GrabItem(lootPile, lootPile.Items[0]);
 		}
 		else if (isRightClick && collider is LootPile lootPile2)
 		{
@@ -434,7 +372,6 @@ public partial class Player : CharacterBody3D
 		}
 		else if (!isRightClick && collider is Npc npc)
 		{
-			SpawnClickIndicator(hitPosition, InteractIndicatorColor);
 			StartAttacking(npc);
 		}
 		else if (isRightClick && collider is Npc npcMenu)
@@ -443,27 +380,20 @@ public partial class Player : CharacterBody3D
 		}
 		else if (collider is Chest chest)
 		{
-			HandleChestClick(chest, isRightClick, mousePos, hitPosition);
-		}
-		else if (!isRightClick)
-		{
-			SpawnClickIndicator(hitPosition, WalkIndicatorColor);
-			_moveTarget = hitPosition;
-			ResetStuckCheck();
+			HandleChestClick(chest, isRightClick, mousePos);
 		}
 	}
 
-	private void HandleChestClick(Chest chest, bool isRightClick, Vector2 mousePos, Vector3 hitPosition)
+	private void HandleChestClick(Chest chest, bool isRightClick, Vector2 mousePos)
 	{
 		if (!chest.IsOpen)
 		{
 			if (isRightClick)
 			{
-				OpenChestClosedContextMenu(chest, mousePos, hitPosition);
+				OpenChestClosedContextMenu(chest, mousePos);
 			}
 			else
 			{
-				SpawnClickIndicator(hitPosition, InteractIndicatorColor);
 				GD.Print("I could loot this chest with the right key!");
 			}
 			return;
@@ -477,42 +407,24 @@ public partial class Player : CharacterBody3D
 
 		if (chest.Items.Count == 0)
 		{
-			SpawnClickIndicator(hitPosition, InteractIndicatorColor);
 			GD.Print("There's nothing left to loot here.");
 			return;
 		}
 
-		SpawnClickIndicator(hitPosition, InteractIndicatorColor);
-
-		Vector3 targetPos = chest.GlobalPosition;
-		_moveTarget = targetPos;
-		_pendingActionPosition = targetPos;
-		_pendingActionRange = InteractRange;
-		_pendingAction = () =>
-		{
-			if (!IsInstanceValid(chest) || chest.Items.Count == 0) return;
-			string topItem = chest.Items[0];
-			GrabItem(chest, topItem);
-		};
-		ResetStuckCheck();
+		GrabItem(chest, chest.Items[0]);
 	}
 
-	private void WalkToAndPickUpKey(KeyPickup keyPickup)
+	private void TryPickUpKey(KeyPickup keyPickup)
 	{
-		Vector3 targetPos = keyPickup.GlobalPosition;
-		_moveTarget = targetPos;
-		_pendingActionPosition = targetPos;
-		_pendingActionRange = InteractRange;
-		_pendingAction = () =>
-		{
-			if (!IsInstanceValid(keyPickup)) return;
-			keyPickup.PickUp();
-		};
-		ResetStuckCheck();
+		if (!IsInstanceValid(keyPickup)) return;
+		if (!CheckReach(keyPickup)) return;
+		keyPickup.PickUp();
 	}
 
 	private void GrabItem(ILootable lootable, string itemName)
 	{
+		if (!CheckReach(lootable as Node3D)) return;
+
 		if (ItemDatabase.IsStackable(itemName))
 		{
 			int count = 0;
@@ -555,36 +467,28 @@ public partial class Player : CharacterBody3D
 	{
 		if (target is Chest chest)
 		{
-			Vector3 targetPos = chest.GlobalPosition;
-			_moveTarget = targetPos;
-			_pendingActionPosition = targetPos;
-			_pendingActionRange = InteractRange;
-			_pendingAction = () =>
+			if (!CheckReach(chest, "use that here")) return;
+
+			if (chest.IsOpen)
 			{
-				if (!IsInstanceValid(chest)) return;
+				PrintDefaultUseMessage();
+				return;
+			}
 
-				if (chest.IsOpen)
-				{
-					PrintDefaultUseMessage();
-					return;
-				}
-
-				if (chest.RequiredKeyName == itemName)
-				{
-					chest.Open();
-					_inventory.RemoveItemAt(itemIndex);
-					GD.Print("The chest opened and magically consumed the key!");
-				}
-				else if (IsKeyItem(itemName))
-				{
-					GD.Print("This key doesn't work here");
-				}
-				else
-				{
-					PrintDefaultUseMessage();
-				}
-			};
-			ResetStuckCheck();
+			if (chest.RequiredKeyName == itemName)
+			{
+				chest.Open();
+				_inventory.RemoveItemAt(itemIndex);
+				GD.Print("The chest opened and magically consumed the key!");
+			}
+			else if (IsKeyItem(itemName))
+			{
+				GD.Print("This key doesn't work here");
+			}
+			else
+			{
+				PrintDefaultUseMessage();
+			}
 		}
 		else
 		{
@@ -652,6 +556,8 @@ public partial class Player : CharacterBody3D
 
 	private void LootStackableItem(ILootable lootable, string itemName)
 	{
+		if (!CheckReach(lootable as Node3D)) return;
+
 		int count = 0;
 		foreach (string item in lootable.Items)
 		{
@@ -671,6 +577,8 @@ public partial class Player : CharacterBody3D
 
 	private void LootSingleItem(ILootable lootable, string itemName)
 	{
+		if (!CheckReach(lootable as Node3D)) return;
+
 		bool added = _inventory.AddItem(itemName, 1);
 		if (!added) return;
 
@@ -678,12 +586,12 @@ public partial class Player : CharacterBody3D
 		lootable.RemoveItem(itemName);
 	}
 
-	private void OpenChestClosedContextMenu(Chest chest, Vector2 mousePos, Vector3 hitPosition)
+	private void OpenChestClosedContextMenu(Chest chest, Vector2 mousePos)
 	{
 		_contextMenu.Clear();
 		_contextMenuActions.Clear();
 
-		AddContextMenuOption("Open", () => TryOpenChestWithInventoryKey(chest, hitPosition));
+		AddContextMenuOption("Open", () => TryOpenChestWithInventoryKey(chest));
 		AddContextMenuOption("Examine", () => GD.Print(chest.GetExamineText()));
 
 		OpenContextMenu(mousePos);
@@ -703,9 +611,10 @@ public partial class Player : CharacterBody3D
 		OpenContextMenu(mousePos);
 	}
 
-	private void TryOpenChestWithInventoryKey(Chest chest, Vector3 hitPosition)
+	private void TryOpenChestWithInventoryKey(Chest chest)
 	{
-		SpawnClickIndicator(hitPosition, InteractIndicatorColor);
+		if (!IsInstanceValid(chest) || chest.IsOpen) return;
+		if (!CheckReach(chest, "open that")) return;
 
 		int keySlot = _inventory.FindSlotIndex(chest.RequiredKeyName);
 
@@ -715,26 +624,9 @@ public partial class Player : CharacterBody3D
 			return;
 		}
 
-		Vector3 targetPos = chest.GlobalPosition;
-		_moveTarget = targetPos;
-		_pendingActionPosition = targetPos;
-		_pendingActionRange = InteractRange;
-		_pendingAction = () =>
-		{
-			if (!IsInstanceValid(chest) || chest.IsOpen) return;
-
-			int currentKeySlot = _inventory.FindSlotIndex(chest.RequiredKeyName);
-			if (currentKeySlot < 0)
-			{
-				GD.Print("I could loot this chest with the right key!");
-				return;
-			}
-
-			chest.Open();
-			_inventory.RemoveItemAt(currentKeySlot);
-			GD.Print("The chest opened and magically consumed the key!");
-		};
-		ResetStuckCheck();
+		chest.Open();
+		_inventory.RemoveItemAt(keySlot);
+		GD.Print("The chest opened and magically consumed the key!");
 	}
 
 	private void OpenKeyPickupContextMenu(KeyPickup keyPickup, Vector2 mousePos)
@@ -742,7 +634,7 @@ public partial class Player : CharacterBody3D
 		_contextMenu.Clear();
 		_contextMenuActions.Clear();
 
-		AddContextMenuOption("Take", () => WalkToAndPickUpKey(keyPickup));
+		AddContextMenuOption("Take", () => TryPickUpKey(keyPickup));
 		AddContextMenuOption("Examine", () => GD.Print(keyPickup.GetExamineText()));
 
 		OpenContextMenu(mousePos);
