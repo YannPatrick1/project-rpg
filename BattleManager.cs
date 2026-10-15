@@ -8,13 +8,6 @@ using System.Linq;
 // once every spawned enemy is dead.
 public partial class BattleManager : Node
 {
-	// World units the active character has to move to count as one
-	// "step" for encounter-roll purposes.
-	[Export] public float StepDistance = 1.0f;
-
-	// Chance (0-1) a battle triggers on any given step.
-	[Export] public float EncounterChancePerStep = 0.10f;
-
 	// Chance (0-1) each spawn slot beyond the first spawns an enemy.
 	// Slot 1 always spawns once a battle triggers at all.
 	[Export] public float AdditionalEnemyChance = 0.5f;
@@ -28,8 +21,6 @@ public partial class BattleManager : Node
 	public static BattleManager Instance { get; private set; }
 
 	private Marker3D _arenaMarker;
-	private Vector3 _lastCheckedPosition;
-	private bool _hasLastPosition = false;
 
 	private bool _inBattle = false;
 	private List<int> _battlePartyIndices = new();
@@ -53,41 +44,6 @@ public partial class BattleManager : Node
 	public bool IsPartyIndexInBattle(int partyIndex)
 	{
 		return _battlePartyIndices.Contains(partyIndex);
-	}
-
-	public override void _PhysicsProcess(double delta)
-	{
-		if (_inBattle) return;
-		if (_arenaMarker == null) return;
-		if (PartyManager.Instance == null) return;
-
-		var activeNode = PartyManager.Instance.GetActiveCharacter();
-		if (activeNode is not Node3D active) return;
-
-		if (!_hasLastPosition)
-		{
-			_lastCheckedPosition = active.GlobalPosition;
-			_hasLastPosition = true;
-			return;
-		}
-
-		float moved = active.GlobalPosition.DistanceTo(_lastCheckedPosition);
-
-		// Handle covering more than one StepDistance in a single frame
-		// (a big teleport, a low-framerate hiccup) by rolling once per
-		// full step covered, not just once per frame regardless of
-		// distance.
-		while (moved >= StepDistance)
-		{
-			_lastCheckedPosition = _lastCheckedPosition.MoveToward(active.GlobalPosition, StepDistance);
-			moved -= StepDistance;
-
-			if (GD.Randf() < EncounterChancePerStep)
-			{
-				StartBattle();
-				return;
-			}
-		}
 	}
 
 	private void StartBattle()
@@ -261,7 +217,6 @@ public partial class BattleManager : Node
 		_preBattlePositions.Clear();
 
 		_inBattle = false;
-		_hasLastPosition = false;
 
 		GetTree().Paused = false;
 	}
